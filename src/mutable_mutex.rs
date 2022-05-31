@@ -1,72 +1,74 @@
 #![allow(dead_code)]
 
-use core::cell::{RefCell, RefMut};
+use core::cell::{Ref, RefCell, RefMut};
 use cortex_m::{
     self,
     interrupt::{free, CriticalSection, Mutex},
 };
 
+#[non_exhaustive]
 #[derive(Debug, Clone)]
-pub struct AlreadyInitialized;
-#[derive(Debug, Clone)]
-pub struct NotInitialized;
+pub enum Error {
+    AlreadyInitialized,
+    NotInitialized,
+}
 
 pub struct MutableMutex<T>(Mutex<RefCell<Option<T>>>);
 impl<'r, T> MutableMutex<T> {
     pub const fn new() -> Self {
         Self(Mutex::new(RefCell::new(None)))
     }
+    pub fn borrow(&'r self, cs: &'r CriticalSection) -> Ref<'r, Option<T>> {
+        self.0.borrow(cs).borrow()
+    }
     pub fn borrow_mut(&'r self, cs: &'r CriticalSection) -> RefMut<'r, Option<T>> {
         self.0.borrow(cs).borrow_mut()
     }
-    pub fn initialize(&self, cs: &CriticalSection, data: T) -> Result<(), AlreadyInitialized> {
-        if self.0.borrow(cs).borrow().is_some() {
-            return Err(AlreadyInitialized);
+    pub fn initialize(&self, cs: &CriticalSection, data: T) -> Result<(), Error> {
+        match *self.borrow(cs) {
+            Some(_) => Err(Error::AlreadyInitialized),
+            None => {
+                *self.borrow_mut(cs) = Some(data);
+                Ok(())
+            }
         }
-        *self.borrow_mut(cs) = Some(data);
-        Ok(())
     }
-    pub fn critical_initialize(&self, data: T) -> Result<(), AlreadyInitialized> {
-        free(|cs| self.initialize(cs, data))
-    }
-    pub fn replace_with<F: Fn(T) -> T>(
-        &self,
-        cs: &CriticalSection,
-        f: F,
-    ) -> Result<(), NotInitialized> {
-        let t = self
-            .borrow_mut(cs)
-            .take()
-            .ok_or(())
-            .map_err(|_| NotInitialized)?;
+    pub fn replace_with<F: Fn(T) -> T>(&self, cs: &CriticalSection, f: F) -> Result<(), Error> {
+        let t = self.borrow_mut(cs).take().ok_or(Error::NotInitialized)?;
         *self.borrow_mut(cs) = Some(f(t));
         Ok(())
     }
-    pub fn critical_replace_with<F: Fn(T) -> T>(&self, f: F) -> Result<(), NotInitialized> {
-        free(|cs| self.replace_with(cs, f))
+    pub fn modify<F: Fn(&mut T)>(&self, cs: &CriticalSection, f: F) -> Result<(), Error> {
+        self.replace_with(cs, |mut v| {
+            f(&mut v);
+            v
+        })
     }
-    pub fn modify<F: Fn(&mut T)>(&self, cs: &CriticalSection, f: F) -> Result<(), NotInitialized> {
-        let mut t = self
-            .borrow_mut(cs)
-            .take()
-            .ok_or(())
-            .map_err(|_| NotInitialized)?;
-        f(&mut t);
-        *self.borrow_mut(cs) = Some(t);
-        Ok(())
-    }
-    pub fn critical_modify<F: Fn(&mut T)>(&self, f: F) -> Result<(), NotInitialized> {
-        free(|cs| self.modify(cs, f))
-    }
-    pub fn deinitialize(&self, cs: &CriticalSection) -> Result<(), NotInitialized>
+    pub fn deinitialize(&self, cs: &CriticalSection) -> Result<(), Error>
     where
         T: Drop,
     {
-        if self.0.borrow(cs).borrow().is_none() {
-            return Err(NotInitialized);
+        match *self.borrow(cs) {
+            None => Err(Error::NotInitialized),
+            Some(_) => {
+                drop(self.borrow_mut(cs).take().unwrap());
+                Ok(())
+            }
         }
-        let mut opt = self.0.borrow(cs).borrow_mut();
-        drop(opt.take().unwrap());
-        Ok(())
+    }
+    pub fn critical_initialize(&self, data: T) -> Result<(), Error> {
+        free(|cs| self.initialize(cs, data))
+    }
+    pub fn critical_replace_with<F: Fn(T) -> T>(&self, f: F) -> Result<(), Error> {
+        free(|cs| self.replace_with(cs, f))
+    }
+    pub fn critical_modify<F: Fn(&mut T)>(&self, f: F) -> Result<(), Error> {
+        free(|cs| self.modify(cs, f))
+    }
+    pub fn critical_deinitialize<F: Fn(&mut T)>(&self) -> Result<(), Error>
+    where
+        T: Drop,
+    {
+        free(|cs| self.deinitialize(cs))
     }
 }
