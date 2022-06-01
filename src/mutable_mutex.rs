@@ -25,12 +25,11 @@ impl<'r, T> MutableMutex<T> {
         self.0.borrow(cs).borrow_mut()
     }
     pub fn initialize(&self, cs: &CriticalSection, data: T) -> Result<(), Error> {
-        match *self.borrow(cs) {
-            Some(_) => Err(Error::AlreadyInitialized),
-            None => {
-                *self.borrow_mut(cs) = Some(data);
-                Ok(())
-            }
+        if self.borrow(cs).is_none() {
+            *self.borrow_mut(cs) = Some(data);
+            Ok(())
+        } else {
+            Err(Error::AlreadyInitialized)
         }
     }
     pub fn replace_with<F: Fn(T) -> T>(&self, cs: &CriticalSection, f: F) -> Result<(), Error> {
@@ -48,12 +47,11 @@ impl<'r, T> MutableMutex<T> {
     where
         T: Drop,
     {
-        match *self.borrow(cs) {
-            None => Err(Error::NotInitialized),
-            Some(_) => {
-                drop(self.borrow_mut(cs).take().unwrap());
-                Ok(())
-            }
+        if self.borrow(cs).is_some() {
+            drop(self.borrow_mut(cs).take().unwrap());
+            Ok(())
+        } else {
+            Err(Error::NotInitialized)
         }
     }
     pub fn critical_initialize(&self, data: T) -> Result<(), Error> {
