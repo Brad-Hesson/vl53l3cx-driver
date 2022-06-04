@@ -3,9 +3,11 @@
 
 mod led_display;
 mod mutable_mutex;
+mod vl53l3cx_hal;
 
 use led_display::LedDisplay;
 use mutable_mutex::MutableMutex;
+use vl53l3cx_hal::VL53L3CX;
 
 use paste::paste;
 
@@ -13,9 +15,9 @@ use cortex_m;
 use cortex_m_rt::entry;
 use hal::{
     delay::Delay,
-    device::{NVIC, TIM7},
-    gpio::{Output, Pin, PushPull, L8},
-    interrupt, pac,
+    device,
+    gpio::{Output, Pin, PushPull, Speed, L8},
+    i2c, interrupt, pac,
     prelude::*,
     stm32::Interrupt,
     timer::{Event, Timer},
@@ -25,71 +27,97 @@ use rtt_target::{rprintln, rtt_init_print};
 use stm32l4xx_hal as hal;
 
 type PA<const N: u8> = Pin<Output<PushPull>, L8, 'A', N>;
-static TIM7_DATA: MutableMutex<(
-    Timer<TIM7>,
-    LedDisplay<PA<0>, PA<7>, PA<6>, PA<5>, PA<4>, PA<3>, PA<1>>,
-)> = MutableMutex::new();
+static TIM7_MUT: MutableMutex<Timer<device::TIM7>> = MutableMutex::new();
+static LED_DISPLAY_MUT: MutableMutex<LedDisplay<PA<0>, PA<7>, PA<6>, PA<5>, PA<4>, PA<3>, PA<1>>> =
+    MutableMutex::new();
 
 #[entry]
 fn main() -> ! {
+    // ---------intialize and test the real-time target printing----------
     rtt_init_print!();
     rprintln!("Hello World");
 
+    // ---------configure the peripheral access structures----------
     let device_peripherals = pac::Peripherals::take().unwrap();
     let cortex_peripherals = cortex_m::Peripherals::take().unwrap();
-
     let mut rcc = device_peripherals.RCC.constrain();
     let mut flash = device_peripherals.FLASH.constrain();
     let mut pwr = device_peripherals.PWR.constrain(&mut rcc.apb1r1);
     let clock = rcc.cfgr.freeze(&mut flash.acr, &mut pwr);
 
+    // ---------configure the gpio ports and gpio pin macro----------
     let mut gpioa = device_peripherals.GPIOA.split(&mut rcc.ahb2);
-    // let gpiob = device_peripherals.GPIOB.split(&mut rcc.ahb2);
-    macro_rules! push_pull_pin {
-        (p $bank:ident $pin:literal) => {
-            paste!([<gpio $bank>].[<p $bank $pin>].into_push_pull_output(&mut [<gpio $bank>].moder, &mut [<gpio $bank>].otyper))
+    let mut gpiob = device_peripherals.GPIOB.split(&mut rcc.ahb2);
+    macro_rules! gpio_pin {
+        (push_pull_output : p $port:ident $pin:literal) => {
+            paste!([<gpio $port>].[<p $port $pin>].into_push_pull_output(&mut [<gpio $port>].moder, &mut [<gpio $port>].otyper))
+        };
+        (open_drain_output : p $port:ident $pin:literal) => {
+            paste!([<gpio $port>].[<p $port $pin>].into_open_drain_output(&mut [<gpio $port>].moder, &mut [<gpio $port>].otyper))
+        };
+        (open_drain_alternate : p $port:ident $pin:literal) => {
+            paste!([<gpio $port>].[<p $port $pin>].into_alternate_open_drain(&mut [<gpio $port>].moder, &mut [<gpio $port>].otyper, &mut [<gpio $port>].afrh))
         };
     }
 
-    // let mut user_led = push_pull_pin!(p b 3);
-
-    let display = LedDisplay::new(
-        push_pull_pin!(p a 0),
-        push_pull_pin!(p a 7),
-        push_pull_pin!(p a 6),
-        push_pull_pin!(p a 5),
-        push_pull_pin!(p a 4),
-        push_pull_pin!(p a 3),
-        push_pull_pin!(p a 1),
-    );
-    let mut timer = Timer::tim7(device_peripherals.TIM7, 4.kHz(), clock, &mut rcc.apb1r1);
-    timer.listen(Event::TimeOut);
-    TIM7_DATA.critical_initialize((timer, display)).unwrap();
-    unsafe {
-        NVIC::unmask(Interrupt::TIM7);
-    }
-
+    // ---------configure the delay clock----------
     let mut delay = Delay::new(cortex_peripherals.SYST, clock);
 
-    let mut a = 1;
+    // ---------configure the ranging sensor----------
+    let xshut_p = gpio_pin!(open_drain_output : p b 7);
+    let mut scl_p = gpio_pin!(open_drain_alternate : p a 9).set_speed(Speed::VeryHigh);
+    let mut sda_p = gpio_pin!(open_drain_alternate : p a 10).set_speed(Speed::VeryHigh);
+    scl_p.internal_pull_up(&mut gpioa.pupdr, true);
+    sda_p.internal_pull_up(&mut gpioa.pupdr, true);
+    let i2c = i2c::I2c::i2c1(
+        device_peripherals.I2C1,
+        (scl_p, sda_p),
+        i2c::Config::with_timing(0x00707CBB),
+        &mut rcc.apb1r1,
+    );
+    let mut sensor = VL53L3CX::new(i2c, 0x52, xshut_p);
+
+    sensor.enable();
+    sensor.wait_device_booted(&mut delay, 100).unwrap();
+
+    // ---------configure the led display----------
+    let display = LedDisplay::new(
+        gpio_pin!(push_pull_output : p a 0),
+        gpio_pin!(push_pull_output : p a 7),
+        gpio_pin!(push_pull_output : p a 6),
+        gpio_pin!(push_pull_output : p a 5),
+        gpio_pin!(push_pull_output : p a 4),
+        gpio_pin!(push_pull_output : p a 3),
+        gpio_pin!(push_pull_output : p a 1),
+    );
+    LED_DISPLAY_MUT.critical_initialize(display).unwrap();
+
+    // ---------configure the display timer----------
+    let mut timer = Timer::tim7(device_peripherals.TIM7, 3.kHz(), clock, &mut rcc.apb1r1);
+    timer.listen(Event::TimeOut);
+    TIM7_MUT.critical_initialize(timer).unwrap();
+    unsafe { device::NVIC::unmask(Interrupt::TIM7) };
+
+    // ---------run the main loop----------
+    let mut a = 0;
     loop {
-        TIM7_DATA
-            .critical_modify(|(_, ref mut display)| {
-                display.buffer[a % 64] = true;
-                display.buffer[(a + 16) % 64] = false;
+        LED_DISPLAY_MUT
+            .critical_modify(|display| {
+                display.display_number(a % 10);
             })
             .unwrap();
-        delay.delay_ms(10u32);
+        delay.delay_ms(1000u32);
         a += 1;
     }
 }
 
 #[interrupt]
 fn TIM7() {
-    TIM7_DATA
-        .critical_modify(|(ref mut timer, ref mut display)| {
-            timer.clear_interrupt(Event::TimeOut);
-            display.flush_next_pin();
-        })
-        .unwrap();
+    cortex_m::interrupt::free(|cs| {
+        TIM7_MUT
+            .modify(cs, |timer| timer.clear_interrupt(Event::TimeOut))
+            .unwrap();
+        LED_DISPLAY_MUT.modify(cs, |display| display.flush_next_pin())
+    })
+    .unwrap();
 }
