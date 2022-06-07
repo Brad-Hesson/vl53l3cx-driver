@@ -1,0 +1,16 @@
+[package]
+name = "vl53l3cx_driver"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cty = "0.2"
+rtt-target = { version = "0.3", features = ["cortex-m"] }
+stm32l4xx-hal = { version = "0.7", features = ["stm32l432", "rt"] }
+
+
+[build-dependencies]
+cc = "1.0"
+bindgen = "0.59"

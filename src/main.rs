@@ -3,11 +3,13 @@
 
 mod led_display;
 mod mutable_mutex;
-mod vl53l3cx_hal;
+
+use core::ptr;
+use core::slice;
 
 use led_display::LedDisplay;
 use mutable_mutex::MutableMutex;
-use vl53l3cx_hal::VL53L3CX;
+use vl53l3cx_driver;
 
 use paste::paste;
 
@@ -75,10 +77,36 @@ fn main() -> ! {
         i2c::Config::with_timing(0x00707CBB),
         &mut rcc.apb1r1,
     );
-    let mut sensor = VL53L3CX::new(i2c, 0x52, xshut_p);
-
+    let mut sensor = vl53l3cx_driver::VL53L3CX::new(i2c, 0x52, xshut_p);
     sensor.enable();
-    sensor.wait_device_booted(&mut delay, 100).unwrap();
+    rprintln!("Model ID: 0x{:02X}", sensor.read_byte(0x010F));
+    rprintln!("Module Type: 0x{:02X}", sensor.read_byte(0x0110));
+    let uid = sensor.get_uid(&mut delay);
+    let puid = ptr::addr_of!(uid);
+    let bytes = unsafe { slice::from_raw_parts(puid as *const u8, 8) };
+    for byte in bytes {
+        rprintln!("0x{:02X}", byte);
+    }
+    sensor.wait_device_booted();
+    rprintln!("booted");
+    sensor.data_init();
+    rprintln!("initialized");
+    loop {
+        sensor.start_measurement();
+        while !!!sensor.get_measurement_data_ready() {}
+        // sensor.wait_measurement_data_ready();
+        let data = sensor.get_multiranging_data();
+        for i in 0..data.NumberOfObjectsFound {
+            let rd = data.RangeData[i as usize];
+            rprintln!(
+                "status={}, D={}mm, Signal={} Mcps, Ambient={} Mcps",
+                rd.RangeStatus,
+                rd.RangeMilliMeter,
+                rd.AmbientRateRtnMegaCps as f32 / 65536.0,
+                rd.AmbientRateRtnMegaCps as f32 / 65536.0
+            );
+        }
+    }
 
     // ---------configure the led display----------
     let display = LedDisplay::new(

@@ -12,6 +12,7 @@ panic-probe = { version = "0.2", features = ["print-rtt"] }
 rtt-target = { version = "0.3", features = ["cortex-m"] }
 stm32l4xx-hal = { version = "0.7", features = ["stm32l432", "rt"] }
 paste = "1.0"
+vl53l3cx_driver = { path = "vl53l3cx_driver" }
 
 # Uncomment for the panic example.
 # panic-itm = "0.4.1"

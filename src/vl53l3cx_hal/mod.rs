@@ -7,7 +7,7 @@ use core::convert::Infallible;
 
 use register_map::*;
 
-use rtt_target::{rprint, rprintln};
+use rtt_target::rprintln;
 use stm32l4xx_hal::{
     delay::Delay,
     i2c,
@@ -15,6 +15,24 @@ use stm32l4xx_hal::{
         _embedded_hal_blocking_i2c_Read as Read, _embedded_hal_blocking_i2c_Write as Write, *,
     },
 };
+
+// -------------------- Usage ---------------------------
+// let xshut_p = gpio_pin!(open_drain_output : p b 7);
+// let mut scl_p = gpio_pin!(open_drain_alternate : p a 9).set_speed(Speed::VeryHigh);
+// let mut sda_p = gpio_pin!(open_drain_alternate : p a 10).set_speed(Speed::VeryHigh);
+// scl_p.internal_pull_up(&mut gpioa.pupdr, true);
+// sda_p.internal_pull_up(&mut gpioa.pupdr, true);
+// let i2c = i2c::I2c::i2c1(
+//     device_peripherals.I2C1,
+//     (scl_p, sda_p),
+//     i2c::Config::with_timing(0x00707CBB),
+//     &mut rcc.apb1r1,
+// );
+// let mut sensor = VL53L3CX::new(i2c, 0x52, xshut_p);
+
+// sensor.enable();
+// sensor.wait_device_booted(&mut delay, 100).unwrap();
+
 
 #[non_exhaustive]
 #[derive(Debug)]
