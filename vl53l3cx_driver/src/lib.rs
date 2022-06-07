@@ -21,19 +21,19 @@ mod bindings {
     #![allow(dead_code)]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
-use bindings::{VL53LX_Dev_t, VL53LX_Error};
 pub use bindings::VL53LX_MultiRangingData_t;
 pub use bindings::VL53LX_TargetRangeData_t;
+use bindings::{VL53LX_Dev_t, VL53LX_Error};
 
-pub struct VL53L3CX<'a, I2C, XSHUT>
+pub struct VL53L3CX<I2C, XSHUT>
 where
     I2C: Write + Read,
 {
     dev_t: bindings::VL53LX_Dev_t,
-    hardware: Hardware<'a, I2C, XSHUT>,
+    hardware: Hardware<I2C, XSHUT>,
 }
 
-impl<'a, I2C, XSHUT> VL53L3CX<'a, I2C, XSHUT>
+impl<'a, I2C, XSHUT> VL53L3CX<I2C, XSHUT>
 where
     I2C: Write<Error = i2c::Error> + Read<Error = i2c::Error>,
 {
@@ -42,7 +42,7 @@ where
             i2c_address,
             i2c,
             xshut_p,
-            delay: None,
+            delay: ptr::null_mut(),
         };
         let mut _self = Self {
             hardware,
@@ -72,21 +72,28 @@ where
         unsafe { bindings::VL53LX_RdByte(pdev, index, &mut data) };
         data
     }
-    pub fn get_uid(&mut self, delay: &'a mut Delay) -> u64 {
+    pub fn get_uid(&mut self, delay: &mut Delay) -> u64 {
         let pdev = &mut self.dev_t;
         let mut hw = unsafe { &mut *((*pdev).hardware as *mut Hardware<I2C, XSHUT>) };
-        hw.delay = Some(delay);
+        hw.delay = delay;
         let mut id = 0u64;
         unsafe { bindings::VL53LX_GetUID(pdev, &mut id) };
+        hw.delay = ptr::null_mut();
         id
     }
-    pub fn wait_device_booted(&mut self) {
+    pub fn wait_device_booted(&mut self, delay: &mut Delay) {
         let pdev = &mut self.dev_t;
+        let mut hw = unsafe { &mut *((*pdev).hardware as *mut Hardware<I2C, XSHUT>) };
+        hw.delay = delay;
         unsafe { bindings::VL53LX_WaitDeviceBooted(pdev) };
+        hw.delay = ptr::null_mut();
     }
-    pub fn data_init(&mut self) {
+    pub fn data_init(&mut self, delay: &mut Delay) {
         let pdev = &mut self.dev_t;
+        let mut hw = unsafe { &mut *((*pdev).hardware as *mut Hardware<I2C, XSHUT>) };
+        hw.delay = delay;
         unsafe { bindings::VL53LX_DataInit(pdev) };
+        hw.delay = ptr::null_mut();
     }
     pub fn start_measurement(&mut self) {
         let pdev = &mut self.dev_t;
@@ -110,20 +117,17 @@ where
     }
 }
 
-struct Hardware<'a, I2C, XSHUT>
+struct Hardware<I2C, XSHUT>
 where
     I2C: Write + Read,
 {
     i2c_address: u8,
     i2c: I2C,
     pub xshut_p: XSHUT,
-    delay: Option<&'a mut Delay>,
-    // TODO: this does not work, the lifetime
-    // lasts for the lifetime of the device rather than 
-    // just the lifetime of the function being called
+    delay: *mut Delay,
 }
 
-impl<'a, I2C, XSHUT> Hardware<'a, I2C, XSHUT>
+impl<'a, I2C, XSHUT> Hardware<I2C, XSHUT>
 where
     I2C: Write<Error = i2c::Error> + Read<Error = i2c::Error>,
 {
@@ -164,11 +168,10 @@ where
     }
     unsafe extern "C" fn wait_us(pdev: *mut VL53LX_Dev_t, count: u32) {
         let _self = &mut *((*pdev).hardware as *mut Self);
-        let delay = _self
-            .delay
-            .take()
-            .expect("delay must be loaded into the harware struct for wait_us");
-        delay.delay_us(count);
-        _self.delay = Some(delay);
+        let pdelay = _self.delay;
+        if pdelay.is_null() {
+            panic!("wait function requires delay to be loaded")
+        }
+        (*pdelay).delay_us(count);
     }
 }

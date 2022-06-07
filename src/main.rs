@@ -25,7 +25,7 @@ use hal::{
     timer::{Event, Timer},
 };
 use panic_probe as _;
-use rtt_target::{rprintln, rtt_init_print};
+use rtt_target::{rprint, rprintln, rtt_init_print};
 use stm32l4xx_hal as hal;
 
 type PA<const N: u8> = Pin<Output<PushPull>, L8, 'A', N>;
@@ -84,17 +84,19 @@ fn main() -> ! {
     let uid = sensor.get_uid(&mut delay);
     let puid = ptr::addr_of!(uid);
     let bytes = unsafe { slice::from_raw_parts(puid as *const u8, 8) };
+    rprint!("Device UID: ");
     for byte in bytes {
-        rprintln!("0x{:02X}", byte);
+        rprint!("0x{:02X} ", byte);
     }
-    sensor.wait_device_booted();
+    rprintln!();
+    sensor.wait_device_booted(&mut delay);
     rprintln!("booted");
-    sensor.data_init();
+    sensor.data_init(&mut delay);
     rprintln!("initialized");
     loop {
         sensor.start_measurement();
-        while !!!sensor.get_measurement_data_ready() {}
-        // sensor.wait_measurement_data_ready();
+        // while !!!sensor.get_measurement_data_ready() {}
+        sensor.wait_measurement_data_ready();
         let data = sensor.get_multiranging_data();
         for i in 0..data.NumberOfObjectsFound {
             let rd = data.RangeData[i as usize];
