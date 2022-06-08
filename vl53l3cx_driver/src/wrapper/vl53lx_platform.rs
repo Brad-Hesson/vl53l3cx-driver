@@ -3,8 +3,10 @@
 
 use crate::bindings::{VL53LX_Dev_t, VL53LX_Error};
 use core::ptr;
+use core::slice;
 
-// use rtt_target::rprintln;
+use rtt_target::{rprint, rprintln};
+const DEBUG: bool = false;
 
 #[no_mangle]
 pub unsafe extern "C" fn VL53LX_WriteMulti(
@@ -13,7 +15,9 @@ pub unsafe extern "C" fn VL53LX_WriteMulti(
     pdata: *mut u8,
     count: u32,
 ) -> VL53LX_Error {
-    // rprintln!("VL53LX_WriteMulti");
+    if DEBUG {
+        rprintln!("VL53LX_WriteMulti");
+    }
     let write_f = (*pdev).write_f.unwrap();
     write_f(pdev, index, pdata, count)
 }
@@ -25,9 +29,16 @@ pub unsafe extern "C" fn VL53LX_ReadMulti(
     pdata: *mut u8,
     count: u32,
 ) -> VL53LX_Error {
-    // rprintln!("VL53LX_ReadMulti");
     let read_f = (*pdev).read_f.unwrap();
-    read_f(pdev, index, pdata, count)
+    let s = read_f(pdev, index, pdata, count);
+    if DEBUG {
+        rprint!("VL53LX_ReadMulti: 0x{:04X} => ", index);
+        for b in slice::from_raw_parts_mut(pdata, count as usize) {
+            rprint!("0x{:02X} ", b);
+        }
+        rprintln!();
+    }
+    s
 }
 
 #[no_mangle]
@@ -36,7 +47,9 @@ pub unsafe extern "C" fn VL53LX_WrByte(
     index: u16,
     mut data: u8,
 ) -> VL53LX_Error {
-    // rprintln!("VL53LX_WrByte");
+    if DEBUG {
+        rprintln!("VL53LX_WrByte: 0x{:04X} <= 0x{:02X}", index, data);
+    }
     let write_f = (*pdev).write_f.unwrap();
     write_f(pdev, index, &mut data, 1)
 }
@@ -47,10 +60,11 @@ pub unsafe extern "C" fn VL53LX_WrWord(
     index: u16,
     data: u16,
 ) -> VL53LX_Error {
-    // rprintln!("VL53LX_WrWord");
+    if DEBUG {
+        rprintln!("VL53LX_WrWord: 0x{:04X} <= 0x{:04X}", index, data);
+    }
     let write_f = (*pdev).write_f.unwrap();
-    let ptr = ptr::addr_of!(data);
-    write_f(pdev, index, ptr as *mut u8, 2)
+    write_f(pdev, index, ptr::addr_of!(data) as *mut u8, 2)
 }
 
 #[no_mangle]
@@ -59,10 +73,11 @@ pub unsafe extern "C" fn VL53LX_WrDWord(
     index: u16,
     data: u32,
 ) -> VL53LX_Error {
-    // rprintln!("VL53LX_WrDWord");
+    if DEBUG {
+        rprintln!("VL53LX_WrDWord: 0x{:04X} <= 0x{:08X}", index, data);
+    }
     let write_f = (*pdev).write_f.unwrap();
-    let ptr = ptr::addr_of!(data);
-    write_f(pdev, index, ptr as *mut u8, 4)
+    write_f(pdev, index, ptr::addr_of!(data) as *mut u8, 4)
 }
 
 #[no_mangle]
@@ -71,7 +86,9 @@ pub unsafe extern "C" fn VL53LX_RdByte(
     index: u16,
     pdata: *mut u8,
 ) -> VL53LX_Error {
-    // rprintln!("VL53LX_RdByte");
+    if DEBUG {
+        rprintln!("VL53LX_RdByte: 0x{:04X}", index);
+    }
     let read_f = (*pdev).read_f.unwrap();
     read_f(pdev, index, pdata, 1)
 }
@@ -82,7 +99,9 @@ pub unsafe extern "C" fn VL53LX_RdWord(
     index: u16,
     pdata: *mut u16,
 ) -> VL53LX_Error {
-    // rprintln!("VL53LX_RdWord");
+    if DEBUG {
+        rprintln!("VL53LX_RdWord: 0x{:04X}", index);
+    }
     let read_f = (*pdev).read_f.unwrap();
     read_f(pdev, index, pdata as *mut u8, 2)
 }
@@ -93,25 +112,29 @@ pub unsafe extern "C" fn VL53LX_RdDWord(
     index: u16,
     pdata: *mut u32,
 ) -> VL53LX_Error {
-    // rprintln!("VL53LX_RdDWord");
+    if DEBUG {
+        rprintln!("VL53LX_RdDWord: 0x{:04X}", index);
+    }
     let read_f = (*pdev).read_f.unwrap();
     read_f(pdev, index, pdata as *mut u8, 4)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn VL53LX_WaitUs(pdev: *mut VL53LX_Dev_t, count: u32) -> VL53LX_Error {
-    // rprintln!("VL53LX_WaitUs");
+    if DEBUG {
+        rprintln!("VL53LX_WaitUs: {}us", count);
+    }
     let wait_us_f = (*pdev).wait_us_f.unwrap();
-    wait_us_f(pdev, count);
-    Default::default()
+    wait_us_f(pdev, count)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn VL53LX_WaitMs(pdev: *mut VL53LX_Dev_t, count: u32) -> VL53LX_Error {
-    // rprintln!("VL53LX_WaitMs");
+    if DEBUG {
+        rprintln!("VL53LX_WaitMs: {}ms", count);
+    }
     let wait_us_f = (*pdev).wait_us_f.unwrap();
-    wait_us_f(pdev, count * 1000);
-    Default::default()
+    wait_us_f(pdev, count * 1000)
 }
 
 #[no_mangle]
@@ -123,16 +146,22 @@ pub unsafe extern "C" fn VL53LX_WaitValueMaskEx(
     mask: u8,
     poll_delay_ms: u32,
 ) -> VL53LX_Error {
+    if DEBUG {
+        rprintln!("VL53LX_WaitValueMaskEx");
+    }
     let mut buffer = 0u8;
     for _ in 0..(timeout_ms / poll_delay_ms) {
-        VL53LX_RdByte(pdev, index, &mut buffer);
+        match VL53LX_RdByte(pdev, index, &mut buffer) {
+            0 => {}
+            status => return status,
+        };
         if buffer & mask == value {
-            break;
+            return 0;
         }
-        VL53LX_WaitMs(pdev, poll_delay_ms);
+        match VL53LX_WaitMs(pdev, poll_delay_ms) {
+            0 => {}
+            status => return status,
+        };
     }
-    // rprintln!("VL53LX_WaitMs");
-    // let wait_us_f = (*pdev).wait_us_f.unwrap();
-    // wait_us_f(pdev, count * 1000);
-    Default::default()
+    -7
 }

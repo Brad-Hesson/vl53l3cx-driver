@@ -27,6 +27,8 @@ fn compile_c_code(file: PathBuf, search_paths: Vec<PathBuf>) {
     for sp in search_paths {
         build.include(sp);
     }
+    build.flag("-Wno-builtin-declaration-mismatch");
+    build.flag("-Wno-implicit-function-declaration");
     build.compile(file.file_stem().unwrap().to_str().unwrap());
 }
 

@@ -49,7 +49,7 @@ typedef struct VL53LX_Dev_t {
 	void* hardware;
 	VL53LX_Error (*read_f)(struct VL53LX_Dev_t*, uint16_t, uint8_t*, uint32_t);
 	VL53LX_Error (*write_f)(struct VL53LX_Dev_t*, uint16_t, uint8_t*, uint32_t);
-	void (*wait_us_f)(struct VL53LX_Dev_t*, uint32_t);
+	VL53LX_Error (*wait_us_f)(struct VL53LX_Dev_t*, uint32_t);
 	/*!< Low Level Driver data structure */
     // uint8_t   i2c_slave_address;
 	// uint8_t   comms_type;
