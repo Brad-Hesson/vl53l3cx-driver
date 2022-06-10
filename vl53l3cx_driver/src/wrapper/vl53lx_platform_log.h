@@ -38,6 +38,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // #include "vl53lx_platform_user_config.h"
 
+#define VL53LX_LOG_ENABLE
+
 #ifdef VL53LX_LOG_ENABLE
 
 	#ifdef _MSC_VER
@@ -46,13 +48,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#       define EWOKPLUS_EXPORTS
 	#endif
 
-	#include <vl53l3_types.h>
+	// #include <vl53l3_types.h>
+	#include <stdint.h>
 
 	#ifdef __cplusplus
 	extern "C" {
 	#endif
 
-	#include <time.h>
+	// #include <time.h>
 
 	/**
 	 * @brief Set the level, output and specific functions for module logging.

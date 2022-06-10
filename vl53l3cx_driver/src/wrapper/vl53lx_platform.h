@@ -426,6 +426,8 @@ VL53LX_Error VL53LX_WaitValueMaskEx(
 		uint8_t       mask,
 		uint32_t      poll_delay_ms);
 
+int sprintf(char* fmt, const char* str, ...);
+
 #ifdef __cplusplus
 }
 #endif

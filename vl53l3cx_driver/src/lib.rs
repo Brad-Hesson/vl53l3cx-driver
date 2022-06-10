@@ -1,4 +1,6 @@
 #![no_std]
+#![feature(c_variadic)]
+
 
 mod defaults;
 mod wrapper;
@@ -207,6 +209,12 @@ where
         })?;
         Ok(data == 1)
     }
+    pub fn set_distance_mode(&mut self, mode: u8) -> Result<(), Error> {
+        self.with_pdev(|pdev| unsafe {
+            bindings::VL53LX_SetDistanceMode(pdev, mode)
+        })?;
+        Ok(())
+    }
     pub fn with_pdev<F>(&mut self, mut f: F) -> Result<(), Error>
     where
         F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
@@ -251,18 +259,12 @@ where
         let _self = &mut *((*pdev).hardware as *mut Self);
         let buffer = [(index >> 8) as u8, index as u8];
         match _self.i2c.write(_self.i2c_address / 2, &buffer) {
-            Err(e) => {
-                rprintln!("Writing Index: {:?}", e);
-                return -13;
-            }
+            Err(_) => return -13,
             Ok(_) => {}
         };
         let mut buffer = slice::from_raw_parts_mut(data, count as usize);
         match _self.i2c.read(_self.i2c_address / 2, &mut buffer) {
-            Err(e) => {
-                rprintln!("Reading Value: {:?}", e);
-                return -13;
-            }
+            Err(_) => return -13,
             Ok(_) => return 0,
         };
     }

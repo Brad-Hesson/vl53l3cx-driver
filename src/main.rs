@@ -4,6 +4,7 @@
 mod led_display;
 mod mutable_mutex;
 
+use core::f64;
 use core::ptr;
 use core::slice;
 
@@ -29,9 +30,9 @@ use stm32l4xx_hal as hal;
 
 type PA<const N: u8> = Pin<Output<PushPull>, L8, 'A', N>;
 static TIM7_MUT: MutableMutex<Timer<device::TIM7>> = MutableMutex::new();
-static LED_DISPLAY_MUT: MutableMutex<
-    LedDisplay<PA<0>, PA<7>, PA<6>, Pin<Output<PushPull>, H8, 'A', 8>, PA<4>, PA<3>, PA<1>>,
-> = MutableMutex::new();
+type Display =
+    LedDisplay<PA<0>, PA<7>, PA<6>, Pin<Output<PushPull>, H8, 'A', 8>, PA<4>, PA<3>, PA<1>>;
+static LED_DISPLAY_MUT: MutableMutex<Display> = MutableMutex::new();
 
 #[entry]
 fn main() -> ! {
@@ -74,7 +75,6 @@ fn main() -> ! {
         gpio_pin!(push_pull_output : p a 1),
     );
     LED_DISPLAY_MUT.critical_initialize(display).unwrap();
-    unsafe { rprintln!("moder: 0b{:32b}", (*pac::GPIOA::ptr()).moder.read().bits()) };
 
     // ---------configure the display timer----------
     let mut timer = Timer::tim7(
@@ -96,7 +96,7 @@ fn main() -> ! {
     let i2c = i2c::I2c::i2c1(
         device_peripherals.I2C1,
         (scl_p, sda_p),
-        i2c::Config::new(100.kHz(), sys_clocks),
+        i2c::Config::with_timing(0x00707CBB),
         &mut rcc.apb1r1,
     );
     let mut sensor = vl53l3cx_driver::VL53L3CX::new(i2c, 0x52, xshut_p);
@@ -115,6 +115,7 @@ fn main() -> ! {
     }
     rprintln!();
     sensor.data_init(&mut delay).unwrap();
+    sensor.set_distance_mode(3).unwrap();
 
     // ---------run the main loop----------
     loop {
@@ -131,11 +132,22 @@ fn main() -> ! {
                 rd.AmbientRateRtnMegaCps as f32 / 65536.0
             );
         }
-        let mut disp = (data.RangeData[0].RangeMilliMeter as f64 / 1500.0 * 10.0) as u8;
-        disp = if disp > 9 { 9 } else { disp };
+        let num = data.RangeData[0].RangeMilliMeter as f64 / 1000.0 * 10.0;
+        let bar = 7 - ((num - (num as u8) as f64) * 8.0) as usize;
+        let mut num = num as usize;
+        num %= 10;
         LED_DISPLAY_MUT
             .critical_modify(|display| {
-                display.display_number(disp);
+                if data.RangeData[0].RangeStatus == 0 {
+                    display.display_number(num as u8);
+                    for row in bar..8 {
+                        for col in 0..8 {
+                            display.buffer[row * 8 + col] = !!!display.buffer[row * 8 + col];
+                        }
+                    }
+                } else {
+                    display.buffer = [false; 64];
+                }
             })
             .unwrap();
     }
@@ -144,11 +156,11 @@ fn main() -> ! {
 #[interrupt]
 fn TIM7() {
     cortex_m::interrupt::free(|cs| {
-        TIM7_MUT
-            .modify(cs, |timer| timer.clear_interrupt(Event::TimeOut))
-            .unwrap();
         LED_DISPLAY_MUT
             .modify(cs, |display| display.flush_next_pin())
             .unwrap();
-    })
+        TIM7_MUT
+            .modify(cs, |timer| timer.clear_interrupt(Event::TimeOut))
+            .unwrap();
+    });
 }

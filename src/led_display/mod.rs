@@ -64,18 +64,24 @@ where
             _ => unimplemented!(),
         }
     }
+    pub fn set_led(&mut self, led: usize) {
+        self.en_p.set_low().ok();
+        let bs = [0b1, 0b10, 0b100, 0b1000, 0b10000, 0b100000].map(|mask| led & mask != 0);
+        self.c1_p.set_state(bs[0].into()).ok();
+        self.c2_p.set_state(bs[1].into()).ok();
+        self.c3_p.set_state(bs[2].into()).ok();
+        self.r1_p.set_state(bs[3].into()).ok();
+        self.r2_p.set_state(bs[4].into()).ok();
+        self.r3_p.set_state(bs[5].into()).ok();
+        self.en_p.set_high().ok();
+    }
+    pub fn all_off(&mut self) {
+        self.en_p.set_low().ok();
+    }
     pub fn flush_next_pin(&mut self) {
         self.en_p.set_low().ok();
         if self.buffer[self.display_index] {
-            let bs = [0b1, 0b10, 0b100, 0b1000, 0b10000, 0b100000]
-                .map(|mask| self.display_index & mask != 0);
-            self.c1_p.set_state(bs[0].into()).ok();
-            self.c2_p.set_state(bs[1].into()).ok();
-            self.c3_p.set_state(bs[2].into()).ok();
-            self.r1_p.set_state(bs[3].into()).ok();
-            self.r2_p.set_state(bs[4].into()).ok();
-            self.r3_p.set_state(bs[5].into()).ok();
-            self.en_p.set_high().ok();
+            self.set_led(self.display_index);
         }
         self.display_index += 1;
         self.display_index %= 64;
