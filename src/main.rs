@@ -4,15 +4,10 @@
 mod led_display;
 mod mutable_mutex;
 
-use core::f64;
-use core::ptr;
-use core::slice;
-
 use led_display::LedDisplay;
 use mutable_mutex::MutableMutex;
 
-use paste::paste;
-
+use core::{f64, ptr, slice};
 use cortex_m;
 use cortex_m_rt::entry;
 use hal::{
@@ -25,6 +20,7 @@ use hal::{
     timer::{Event, Timer},
 };
 use panic_probe as _;
+use paste::paste;
 use rtt_target::{rprint, rprintln, rtt_init_print};
 use stm32l4xx_hal as hal;
 
@@ -116,22 +112,13 @@ fn main() -> ! {
     rprintln!();
     sensor.data_init(&mut delay).unwrap();
     sensor.set_distance_mode(3).unwrap();
+    sensor.set_measurement_timing_budget_ms(100).unwrap();
 
     // ---------run the main loop----------
     loop {
         sensor.start_measurement().unwrap();
         sensor.wait_measurement_data_ready(&mut delay).unwrap();
         let data = sensor.get_multiranging_data().unwrap();
-        for i in 0..data.NumberOfObjectsFound {
-            let rd = data.RangeData[i as usize];
-            rprintln!(
-                "status={}, D={}mm, Signal={} Mcps, Ambient={} Mcps",
-                rd.RangeStatus,
-                rd.RangeMilliMeter,
-                rd.AmbientRateRtnMegaCps as f32 / 65536.0,
-                rd.AmbientRateRtnMegaCps as f32 / 65536.0
-            );
-        }
         let num = data.RangeData[0].RangeMilliMeter as f64 / 1000.0 * 10.0;
         let bar = 7 - ((num - (num as u8) as f64) * 8.0) as usize;
         let mut num = num as usize;

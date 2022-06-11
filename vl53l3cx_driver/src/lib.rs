@@ -1,14 +1,13 @@
 #![no_std]
 #![feature(c_variadic)]
 
-
 mod defaults;
+mod driver;
 mod wrapper;
 
-use core::{convert::Infallible, ptr, slice};
+use core::{convert::Infallible, ptr};
 use cty::c_void;
-#[allow(unused_imports)]
-use rtt_target::rprintln;
+use driver::Hardware;
 use stm32l4xx_hal::{
     delay::Delay,
     i2c,
@@ -28,8 +27,117 @@ pub use bindings::VL53LX_MultiRangingData_t;
 pub use bindings::VL53LX_TargetRangeData_t;
 use bindings::{VL53LX_Dev_t, VL53LX_Error};
 
-#[derive(Debug, Clone, Copy)]
+pub struct VL53L3CX<I2C, XSHUT> {
+    dev_t: VL53LX_Dev_t,
+    hardware: Hardware<I2C, XSHUT>,
+}
+impl<I2C, XSHUT> VL53L3CX<I2C, XSHUT>
+where
+    I2C: Write<Error = i2c::Error> + Read<Error = i2c::Error>,
+    XSHUT: OutputPin<Error = Infallible>,
+{
+    pub fn new(i2c: I2C, i2c_address: u8, xshut_pin: XSHUT) -> Self {
+        let hardware = Hardware::<I2C, XSHUT> {
+            i2c_address,
+            i2c,
+            xshut_pin,
+            delay: ptr::null_mut(),
+        };
+        let mut _self = Self {
+            hardware,
+            dev_t: VL53LX_Dev_t {
+                hardware_p: ptr::null_mut(),
+                read_f: Some(Hardware::<I2C, XSHUT>::read),
+                write_f: Some(Hardware::<I2C, XSHUT>::write),
+                wait_us_f: Some(Hardware::<I2C, XSHUT>::wait_us),
+                Data: Default::default(),
+            },
+        };
+        _self.dev_t.hardware_p = ptr::addr_of_mut!(_self.hardware) as *mut c_void;
+        _self
+    }
+    pub fn enable(&mut self) {
+        self.hardware
+            .xshut_pin
+            .set_high()
+            .expect("setting pin state is infallible");
+    }
+    pub fn read_byte(&mut self, index: u16) -> Result<u8, Error> {
+        let mut data: u8 = 0;
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_RdByte(pdev, index, &mut data) })?;
+        Ok(data)
+    }
+    pub fn get_uid(&mut self, delay: &mut Delay) -> Result<u64, Error> {
+        let mut id = 0u64;
+        self.with_delay(delay, |pdev| unsafe {
+            bindings::VL53LX_GetUID(pdev, &mut id)
+        })?;
+        Ok(id)
+    }
+    pub fn wait_device_booted(&mut self, delay: &mut Delay) -> Result<(), Error> {
+        self.with_delay(delay, |pdev| unsafe {
+            bindings::VL53LX_WaitDeviceBooted(pdev)
+        })?;
+        Ok(())
+    }
+    pub fn data_init(&mut self, delay: &mut Delay) -> Result<(), Error> {
+        self.with_delay(delay, |pdev| unsafe { bindings::VL53LX_DataInit(pdev) })?;
+        Ok(())
+    }
+    pub fn start_measurement(&mut self) -> Result<(), Error> {
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_StartMeasurement(pdev) })?;
+        Ok(())
+    }
+    pub fn wait_measurement_data_ready(&mut self, delay: &mut Delay) -> Result<(), Error> {
+        self.with_delay(delay, |pdev| unsafe {
+            bindings::VL53LX_WaitMeasurementDataReady(pdev)
+        })?;
+        Ok(())
+    }
+    pub fn get_multiranging_data(&mut self) -> Result<VL53LX_MultiRangingData_t, Error> {
+        let mut data = VL53LX_MultiRangingData_t::default();
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_GetMultiRangingData(pdev, &mut data) })?;
+        Ok(data)
+    }
+    pub fn get_measurement_data_ready(&mut self) -> Result<bool, Error> {
+        let mut data = 0u8;
+        self.with_pdev(|pdev| unsafe {
+            bindings::VL53LX_GetMeasurementDataReady(pdev, &mut data)
+        })?;
+        Ok(data == 1)
+    }
+    pub fn set_measurement_timing_budget_ms(&mut self, ms: u32) -> Result<(), Error> {
+        self.with_pdev(|pdev| unsafe {
+            bindings::VL53LX_SetMeasurementTimingBudgetMicroSeconds(pdev, ms * 1000)
+        })?;
+        Ok(())
+    }
+    pub fn set_distance_mode(&mut self, mode: u8) -> Result<(), Error> {
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_SetDistanceMode(pdev, mode) })?;
+        Ok(())
+    }
+    fn with_pdev<F>(&mut self, mut f: F) -> Result<(), Error>
+    where
+        F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
+    {
+        match f(&mut self.dev_t) {
+            0 => Ok(()),
+            status => Err(Error::from(status)),
+        }
+    }
+    fn with_delay<F>(&mut self, delay: &mut Delay, f: F) -> Result<(), Error>
+    where
+        F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
+    {
+        let hw = unsafe { &mut *(self.dev_t.hardware_p as *mut Hardware<I2C, XSHUT>) };
+        hw.delay = delay;
+        self.with_pdev(f)?;
+        hw.delay = ptr::null_mut();
+        Ok(())
+    }
+}
 
+#[derive(Debug, Clone, Copy)]
 pub enum Error {
     None,
     CalibrationWarning,
@@ -122,181 +230,6 @@ impl From<VL53LX_Error> for Error {
             -41 => Error::NotImplemented,
             -60 => Error::PlatformSpecificStart,
             _ => unimplemented!(),
-        }
-    }
-}
-
-pub struct VL53L3CX<I2C, XSHUT>
-where
-    I2C: Write + Read,
-{
-    dev_t: VL53LX_Dev_t,
-    hardware: Hardware<I2C, XSHUT>,
-}
-
-impl<I2C, XSHUT> VL53L3CX<I2C, XSHUT>
-where
-    I2C: Write<Error = i2c::Error> + Read<Error = i2c::Error>,
-    XSHUT: OutputPin<Error = Infallible>,
-{
-    pub fn new(i2c: I2C, i2c_address: u8, xshut_p: XSHUT) -> Self {
-        let hardware = Hardware::<I2C, XSHUT> {
-            i2c_address,
-            i2c,
-            xshut_p,
-            delay: ptr::null_mut(),
-        };
-        let mut _self = Self {
-            hardware,
-            dev_t: VL53LX_Dev_t {
-                hardware: ptr::null_mut(),
-                read_f: Some(Hardware::<I2C, XSHUT>::read),
-                write_f: Some(Hardware::<I2C, XSHUT>::write),
-                wait_us_f: Some(Hardware::<I2C, XSHUT>::wait_us),
-                Data: Default::default(),
-            },
-        };
-        _self.dev_t.hardware = ptr::addr_of_mut!(_self.hardware) as *mut c_void;
-        _self
-    }
-    pub fn enable(&mut self) {
-        self.hardware
-            .xshut_p
-            .set_high()
-            .expect("setting pin state is infallible");
-    }
-    pub fn read_byte(&mut self, index: u16) -> Result<u8, Error> {
-        let mut data: u8 = 0;
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_RdByte(pdev, index, &mut data) })?;
-        Ok(data)
-    }
-    pub fn get_uid(&mut self, delay: &mut Delay) -> Result<u64, Error> {
-        let mut id = 0u64;
-        self.with_delay(delay, |pdev| unsafe {
-            bindings::VL53LX_GetUID(pdev, &mut id)
-        })?;
-        Ok(id)
-    }
-    pub fn wait_device_booted(&mut self, delay: &mut Delay) -> Result<(), Error> {
-        self.with_delay(delay, |pdev| unsafe {
-            bindings::VL53LX_WaitDeviceBooted(pdev)
-        })?;
-        Ok(())
-    }
-    pub fn data_init(&mut self, delay: &mut Delay) -> Result<(), Error> {
-        self.with_delay(delay, |pdev| unsafe { bindings::VL53LX_DataInit(pdev) })?;
-        Ok(())
-    }
-    pub fn start_measurement(&mut self) -> Result<(), Error> {
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_StartMeasurement(pdev) })?;
-        Ok(())
-    }
-    pub fn wait_measurement_data_ready(&mut self, delay: &mut Delay) -> Result<(), Error> {
-        self.with_delay(delay, |pdev| unsafe {
-            bindings::VL53LX_WaitMeasurementDataReady(pdev)
-        })?;
-        Ok(())
-    }
-    pub fn get_multiranging_data(&mut self) -> Result<VL53LX_MultiRangingData_t, Error> {
-        let mut data = VL53LX_MultiRangingData_t::default();
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_GetMultiRangingData(pdev, &mut data) })?;
-        Ok(data)
-    }
-    pub fn get_measurement_data_ready(&mut self) -> Result<bool, Error> {
-        let mut data = 0u8;
-        self.with_pdev(|pdev| unsafe {
-            bindings::VL53LX_GetMeasurementDataReady(pdev, &mut data)
-        })?;
-        Ok(data == 1)
-    }
-    pub fn set_distance_mode(&mut self, mode: u8) -> Result<(), Error> {
-        self.with_pdev(|pdev| unsafe {
-            bindings::VL53LX_SetDistanceMode(pdev, mode)
-        })?;
-        Ok(())
-    }
-    pub fn with_pdev<F>(&mut self, mut f: F) -> Result<(), Error>
-    where
-        F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
-    {
-        match f(&mut self.dev_t) {
-            0 => Ok(()),
-            status => Err(Error::from(status)),
-        }
-    }
-    pub fn with_delay<F>(&mut self, delay: &mut Delay, f: F) -> Result<(), Error>
-    where
-        F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
-    {
-        let hw = unsafe { &mut *(self.dev_t.hardware as *mut Hardware<I2C, XSHUT>) };
-        hw.delay = delay;
-        self.with_pdev(f)?;
-        hw.delay = ptr::null_mut();
-        Ok(())
-    }
-}
-
-struct Hardware<I2C, XSHUT>
-where
-    I2C: Write + Read,
-{
-    i2c_address: u8,
-    i2c: I2C,
-    pub xshut_p: XSHUT,
-    delay: *mut Delay,
-}
-
-impl<I2C, XSHUT> Hardware<I2C, XSHUT>
-where
-    I2C: Write<Error = i2c::Error> + Read<Error = i2c::Error>,
-{
-    unsafe extern "C" fn read(
-        pdev: *mut VL53LX_Dev_t,
-        index: u16,
-        data: *mut u8,
-        count: u32,
-    ) -> VL53LX_Error {
-        let _self = &mut *((*pdev).hardware as *mut Self);
-        let buffer = [(index >> 8) as u8, index as u8];
-        match _self.i2c.write(_self.i2c_address / 2, &buffer) {
-            Err(_) => return -13,
-            Ok(_) => {}
-        };
-        let mut buffer = slice::from_raw_parts_mut(data, count as usize);
-        match _self.i2c.read(_self.i2c_address / 2, &mut buffer) {
-            Err(_) => return -13,
-            Ok(_) => return 0,
-        };
-    }
-    unsafe extern "C" fn write(
-        pdev: *mut VL53LX_Dev_t,
-        index: u16,
-        data: *mut u8,
-        count: u32,
-    ) -> VL53LX_Error {
-        let _self = &mut *((*pdev).hardware as *mut Self);
-        let mut buffer = [0u8; 256];
-        buffer[0] = (index >> 8) as u8;
-        buffer[1] = index as u8;
-        let mut i = 2;
-        for byte in slice::from_raw_parts(data, count as usize) {
-            buffer[i] = *byte;
-            i += 1;
-        }
-        let buffer_slice = slice::from_raw_parts(&buffer as *const u8, (count + 2) as usize);
-        match _self.i2c.write(_self.i2c_address / 2, buffer_slice) {
-            Err(_) => return -13,
-            Ok(_) => return 0,
-        }
-    }
-    unsafe extern "C" fn wait_us(pdev: *mut VL53LX_Dev_t, count: u32) -> VL53LX_Error {
-        let _self = &mut *((*pdev).hardware as *mut Self);
-        match _self.delay.as_mut() {
-            None => panic!("wait function requires delay to be loaded"),
-            Some(delay) => {
-                delay.delay_us(count);
-                0
-            }
         }
     }
 }
