@@ -29,6 +29,7 @@ fn compile_c_code(file: PathBuf, search_paths: Vec<PathBuf>) {
     }
     build.flag("-Wno-builtin-declaration-mismatch");
     build.flag("-Wno-implicit-function-declaration");
+    build.flag("-Wno-format");
     build.compile(file.file_stem().unwrap().to_str().unwrap());
 }
 
