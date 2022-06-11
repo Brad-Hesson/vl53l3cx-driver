@@ -7,7 +7,7 @@ mod mutable_mutex;
 use led_display::LedDisplay;
 use mutable_mutex::MutableMutex;
 
-use core::{f64, ptr, slice};
+use core::f64;
 use cortex_m;
 use cortex_m_rt::entry;
 use hal::{
@@ -21,7 +21,7 @@ use hal::{
 };
 use panic_probe as _;
 use paste::paste;
-use rtt_target::{rprint, rprintln, rtt_init_print};
+use rtt_target::{rprintln, rtt_init_print};
 use stm32l4xx_hal as hal;
 
 type PA<const N: u8> = Pin<Output<PushPull>, L8, 'A', N>;
@@ -96,20 +96,8 @@ fn main() -> ! {
         &mut rcc.apb1r1,
     );
     let mut sensor = vl53l3cx_driver::VL53L3CX::new(i2c, 0x52, xshut_p);
-
-    // ---------initialize the ranging sensor----------
     sensor.enable();
     sensor.wait_device_booted(&mut delay).unwrap();
-    rprintln!("Model ID: 0x{:02X}", sensor.read_byte(0x010F).unwrap());
-    rprintln!("Module Type: 0x{:02X}", sensor.read_byte(0x0110).unwrap());
-    let uid = sensor.get_uid(&mut delay).unwrap();
-    let puid = ptr::addr_of!(uid);
-    let bytes = unsafe { slice::from_raw_parts(puid as *const u8, 8) };
-    rprint!("Device UID: ");
-    for byte in bytes {
-        rprint!("0x{:02X} ", byte);
-    }
-    rprintln!();
     sensor.data_init(&mut delay).unwrap();
     sensor.set_distance_mode(3).unwrap();
     sensor.set_measurement_timing_budget_ms(100).unwrap();
