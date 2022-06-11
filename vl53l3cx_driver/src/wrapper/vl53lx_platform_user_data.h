@@ -33,14 +33,8 @@
 * 
 */
 
-// #include "stm32xxx_hal.h"
-
 #ifndef _VL53LX_PLATFORM_USER_DATA_H_
 #define _VL53LX_PLATFORM_USER_DATA_H_
-
-#ifndef __KERNEL__
-// #include <stdlib.h>
-#endif
 
 #include "vl53lx_def.h"
 
@@ -50,21 +44,6 @@ typedef struct VL53LX_Dev_t {
 	VL53LX_Error (*read_f)(struct VL53LX_Dev_t*, uint16_t, uint8_t*, uint32_t);
 	VL53LX_Error (*write_f)(struct VL53LX_Dev_t*, uint16_t, uint8_t*, uint32_t);
 	VL53LX_Error (*wait_us_f)(struct VL53LX_Dev_t*, uint32_t);
-	/*!< Low Level Driver data structure */
-    // uint8_t   i2c_slave_address;
-	// uint8_t   comms_type;
-	// uint16_t  comms_speed_khz;
-	// I2C_HandleTypeDef *I2cHandle;
-	// uint8_t   I2cDevAddr;
-	// int     Present;
-	// int 	Enabled;
-	// int LoopState;
-	// int FirstStreamCountZero;
-	// int 	Idle;
-	// int		Ready;
-	// uint8_t RangeStatus;
-	// FixPoint1616_t SignalRateRtnMegaCps;
-	// VL53LX_DeviceState   device_state;  /*!< Device State */
 } VL53LX_Dev_t;
 
 typedef VL53LX_Dev_t* VL53LX_DEV;
@@ -95,4 +74,3 @@ typedef VL53LX_Dev_t* VL53LX_DEV;
 #define VL53LXDevStructGetLLResultsHandle(Dev) (&Dev->Data.llresults)
 
 #endif
-

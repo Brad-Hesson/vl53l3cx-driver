@@ -26,7 +26,6 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
 
-
 #ifndef _VL53LX_PLATFORM_H_
 #define _VL53LX_PLATFORM_H_
 
@@ -36,20 +35,15 @@
 #include "vl53lx_error_codes.h"
 
 #define VL53LX_IPP_API
-// #include <vl53lx_platform_ipp_imports.h>
 #include <vl53lx_platform_user_data.h>
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
+int sprintf(char* fmt, const char* str, ...);
 
 /**
  * @file   VL53LX_platform.h
  *
  * @brief  All end user OS/platform/application porting
  */
-
 
 
 /**
@@ -425,12 +419,6 @@ VL53LX_Error VL53LX_WaitValueMaskEx(
 		uint8_t       value,
 		uint8_t       mask,
 		uint32_t      poll_delay_ms);
-
-int sprintf(char* fmt, const char* str, ...);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

@@ -38,9 +38,6 @@
 
 #include <stdint.h>
 #include <stddef.h>
-// #include <string.h>
-// #include <stdio.h>
-// #include <stdlib.h>
 
 #ifndef NULL
 #error "Error NULL definition should be done. Please add required include "

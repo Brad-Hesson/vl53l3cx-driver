@@ -36,9 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef _VL53LX_PLATFORM_LOG_H_
 #define _VL53LX_PLATFORM_LOG_H_
 
-// #include "vl53lx_platform_user_config.h"
-
-#define VL53LX_LOG_ENABLE
+#include "vl53lx_platform_user_config.h"
 
 #ifdef VL53LX_LOG_ENABLE
 
@@ -48,14 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#       define EWOKPLUS_EXPORTS
 	#endif
 
-	// #include <vl53l3_types.h>
-	#include <stdint.h>
-
-	#ifdef __cplusplus
-	extern "C" {
-	#endif
-
-	// #include <time.h>
+	#include <vl53lx_types.h>
 
 	/**
 	 * @brief Set the level, output and specific functions for module logging.
@@ -207,9 +198,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 	#define _LOG_STRING_BUFFER(x) char x[VL53LX_MAX_STRING_LENGTH]
 
-	#ifdef __cplusplus
-	}
-	#endif
 
 #else /* VL53LX_LOG_ENABLE - no logging */
 
