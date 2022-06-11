@@ -13,7 +13,7 @@ pub struct Hardware<I2C, XSHUT>
     pub i2c_address: u8,
     pub i2c: I2C,
     pub xshut_pin: XSHUT,
-    pub delay: *mut Delay,
+    pub delay_p: *mut Delay,
 }
 
 impl<I2C, XSHUT> Hardware<I2C, XSHUT>
@@ -61,7 +61,7 @@ where
     }
     pub unsafe extern "C" fn wait_us(pdev: *mut VL53LX_Dev_t, count: u32) -> VL53LX_Error {
         let _self = &mut *((*pdev).hardware_p as *mut Self);
-        match _self.delay.as_mut() {
+        match _self.delay_p.as_mut() {
             None => panic!("wait function requires delay to be loaded"),
             Some(delay) => {
                 delay.delay_us(count);

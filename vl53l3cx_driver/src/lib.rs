@@ -41,7 +41,7 @@ where
             i2c_address,
             i2c,
             xshut_pin,
-            delay: ptr::null_mut(),
+            delay_p: ptr::null_mut(),
         };
         let mut _self = Self {
             hardware,
@@ -129,10 +129,11 @@ where
     where
         F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
     {
-        let hw = unsafe { &mut *(self.dev_t.hardware_p as *mut Hardware<I2C, XSHUT>) };
-        hw.delay = delay;
+        let hardware_p = self.dev_t.hardware_p as *mut Hardware<I2C, XSHUT>;
+        let hardware = unsafe { hardware_p.as_mut() }.unwrap();
+        hardware.delay_p = delay;
         let result = self.with_pdev(f);
-        hw.delay = ptr::null_mut();
+        hardware.delay_p = ptr::null_mut();
         result
     }
 }
