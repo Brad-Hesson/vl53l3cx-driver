@@ -131,9 +131,9 @@ where
     {
         let hw = unsafe { &mut *(self.dev_t.hardware_p as *mut Hardware<I2C, XSHUT>) };
         hw.delay = delay;
-        self.with_pdev(f)?;
+        let result = self.with_pdev(f);
         hw.delay = ptr::null_mut();
-        Ok(())
+        result
     }
 }
 
