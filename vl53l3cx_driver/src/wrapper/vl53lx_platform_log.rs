@@ -1,7 +1,7 @@
-use core::ffi::VaListImpl;
+use core::{ffi::VaListImpl, fmt::Write, ops::Deref, ptr};
 use rtt_target::rprint;
 
-const DEBUG: bool = false;
+const DEBUG: bool = true;
 
 #[no_mangle]
 pub unsafe extern "C" fn VL53LX_clock() -> u32 {
@@ -13,7 +13,7 @@ pub unsafe extern "C" fn VL53LX_trace_print_module_function(
     _module: u32,
     level: u32,
     _function: u32,
-    str: *mut u8,
+    src_p: *mut u8,
     mut args: ...
 ) {
     if !!!DEBUG {
@@ -22,7 +22,15 @@ pub unsafe extern "C" fn VL53LX_trace_print_module_function(
     if Level::from(level) != Level::Vl53LxTraceLevelDebug {
         return;
     }
-    print_format_cstr(str, &mut args);
+    let mut dst_buf = [0u8; 256];
+    let mut dst_p = ptr::addr_of_mut!(dst_buf) as *mut u8;
+    let mut dst = CharPtr::from(dst_p);
+    write_cstr_formatted(&mut dst, &mut CharPtr::from(src_p), &mut args);
+    write!(dst, "\0").unwrap();
+    while *dst_p != 0 {
+        rprint!("{}", *dst_p as char);
+        dst_p = dst_p.add(1);
+    }
 }
 
 #[allow(non_upper_case_globals)]
@@ -30,60 +38,91 @@ pub unsafe extern "C" fn VL53LX_trace_print_module_function(
 pub static _trace_level: u32 = 0x00000008;
 
 #[no_mangle]
-pub unsafe extern "C" fn sprintf(_fmt: *mut u8, _str: *mut u8, _args: ...) -> u32 {
+pub unsafe extern "C" fn sprintf(dst_p: *mut u8, src_p: *mut u8, mut args: ...) -> u32 {
+    let mut dst = CharPtr::from(dst_p);
+    write_cstr_formatted(&mut dst, &mut src_p.into(), &mut args);
+    write!(dst, "\0").unwrap();
     0
 }
 
-unsafe fn print_format_cstr(mut ptr: *mut u8, args: &mut VaListImpl) {
-    while *ptr != 0 {
-        let c = *ptr as char;
-        if c == '%' {
-            ptr = print_format_replacement(ptr, args);
+struct CharPtr(*mut u8);
+impl From<*mut u8> for CharPtr {
+    fn from(ptr: *mut u8) -> Self {
+        Self(ptr)
+    }
+}
+impl CharPtr {
+    fn peek(&self) -> u8 {
+        unsafe { *self.0 }
+    }
+    fn pop(&mut self) -> u8 {
+        let b = unsafe { *self.0 };
+        self.0 = unsafe { self.0.add(1) };
+        b
+    }
+}
+impl Deref for CharPtr {
+    type Target = *mut u8;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl Write for CharPtr {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        for b in s.bytes() {
+            unsafe {
+                *self.0 = b;
+                self.0 = self.0.add(1);
+            }
+        }
+        Ok(())
+    }
+}
+
+unsafe fn write_cstr_formatted(dst: &mut CharPtr, src: &mut CharPtr, args: &mut VaListImpl) {
+    while src.peek() != 0 {
+        if src.peek() as char == '%' {
+            write_format_specifier(dst, src, args);
         } else {
-            rprint!("{}", c);
-            ptr = ptr.add(1);
+            write!(dst, "{}", src.pop() as char).unwrap();
         }
     }
 }
 
-unsafe fn print_cstr(mut ptr: *mut u8) {
-    while *ptr != 0 {
-        rprint!("{}", *ptr as char);
-        ptr = ptr.add(1);
+unsafe fn write_cstr(dst: &mut CharPtr, src: &mut CharPtr) {
+    while src.peek() != 0 {
+        write!(dst, "{}", src.pop() as char).unwrap();
     }
 }
 
-unsafe fn print_format_replacement(mut ptr: *mut u8, args: &mut VaListImpl) -> *mut u8 {
-    if *ptr.add(1) as char == '%' {
-        rprint!("%");
-        ptr = ptr.add(2);
+unsafe fn write_format_specifier(dst: &mut CharPtr, src: &mut CharPtr, args: &mut VaListImpl) {
+    src.pop();
+    if src.peek() as char == '%' {
+        write!(dst, "%").unwrap();
+        src.pop();
     } else {
         loop {
-            ptr = ptr.add(1);
-            match *ptr as char {
+            match src.pop() as char {
                 'u' => {
-                    rprint!("{}", args.arg::<u32>());
-                    ptr = ptr.add(1);
+                    write!(dst, "{}", args.arg::<u32>()).unwrap();
                     break;
                 }
                 'd' => {
-                    rprint!("{}", args.arg::<i32>());
-                    ptr = ptr.add(1);
+                    write!(dst, "{}", args.arg::<i32>()).unwrap();
                     break;
                 }
                 's' => {
-                    print_cstr(args.arg::<*mut u8>());
-                    ptr = ptr.add(1);
+                    write_cstr(dst, &mut args.arg::<*mut u8>().into());
                     break;
                 }
                 'l' => {
-                    rprint!("{}", args.arg::<u32>());
-                    ptr = ptr.add(2);
+                    write!(dst, "{}", args.arg::<u32>()).unwrap();
+                    src.pop();
                     break;
                 }
                 'X' => {
-                    rprint!("%X");
-                    ptr = ptr.add(1);
+                    write!(dst, "(X)").unwrap();
                     break;
                 }
                 '\0' => panic!("end of string while parsing format"),
@@ -91,7 +130,6 @@ unsafe fn print_format_replacement(mut ptr: *mut u8, args: &mut VaListImpl) -> *
             }
         }
     }
-    ptr
 }
 
 #[derive(Debug, PartialEq, Eq)]
