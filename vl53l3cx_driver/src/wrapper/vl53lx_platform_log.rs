@@ -1,7 +1,7 @@
 use core::{ffi::VaListImpl, fmt::Write, ops::Deref, ptr};
 use rtt_target::rprint;
 
-const DEBUG: bool = true;
+const DEBUG: bool = false;
 
 #[no_mangle]
 pub unsafe extern "C" fn VL53LX_clock() -> u32 {
