@@ -5,15 +5,15 @@ mod defaults;
 mod driver;
 mod wrapper;
 
-use core::{convert::Infallible, ptr};
-use cty::c_void;
-use driver::Hardware;
-use stm32l4xx_hal::{
-    delay::Delay,
-    i2c,
-    prelude::{
-        _embedded_hal_blocking_i2c_Read as Read, _embedded_hal_blocking_i2c_Write as Write, *,
+use crate::driver::Hardware;
+use ::core::{convert::Infallible, ptr};
+use ::cty::c_void;
+use ::embedded_hal::{
+    blocking::{
+        delay::DelayUs,
+        i2c::{Read, Write},
     },
+    digital::v2::OutputPin,
 };
 
 mod bindings {
@@ -27,17 +27,23 @@ pub use bindings::VL53LX_MultiRangingData_t;
 pub use bindings::VL53LX_TargetRangeData_t;
 use bindings::{VL53LX_Dev_t, VL53LX_Error};
 
-pub struct VL53L3CX<I2C, XSHUT> {
-    dev_t: VL53LX_Dev_t,
-    hardware: Hardware<I2C, XSHUT>,
-}
-impl<I2C, XSHUT> VL53L3CX<I2C, XSHUT>
+pub struct VL53L3CX<I2C, XSHUT, DELAY>
 where
-    I2C: Write<Error = i2c::Error> + Read<Error = i2c::Error>,
+    I2C: Write + Read,
     XSHUT: OutputPin<Error = Infallible>,
+    DELAY: DelayUs<u32>,
+{
+    dev_t: VL53LX_Dev_t,
+    hardware: Hardware<I2C, XSHUT, DELAY>,
+}
+impl<I2C, XSHUT, DELAY> VL53L3CX<I2C, XSHUT, DELAY>
+where
+    I2C: Write + Read,
+    XSHUT: OutputPin<Error = Infallible>,
+    DELAY: DelayUs<u32>,
 {
     pub fn new(i2c: I2C, i2c_address: u8, xshut_pin: XSHUT) -> Self {
-        let hardware = Hardware::<I2C, XSHUT> {
+        let hardware = Hardware::<I2C, XSHUT, DELAY> {
             i2c_address,
             i2c,
             xshut_pin,
@@ -47,9 +53,9 @@ where
             hardware,
             dev_t: VL53LX_Dev_t {
                 hardware_p: ptr::null_mut(),
-                read_f: Some(Hardware::<I2C, XSHUT>::read),
-                write_f: Some(Hardware::<I2C, XSHUT>::write),
-                wait_us_f: Some(Hardware::<I2C, XSHUT>::wait_us),
+                read_f: Some(Hardware::<I2C, XSHUT, DELAY>::read),
+                write_f: Some(Hardware::<I2C, XSHUT, DELAY>::write),
+                wait_us_f: Some(Hardware::<I2C, XSHUT, DELAY>::wait_us),
                 Data: Default::default(),
             },
         };
@@ -67,20 +73,20 @@ where
         self.with_pdev(|pdev| unsafe { bindings::VL53LX_RdByte(pdev, index, &mut data) })?;
         Ok(data)
     }
-    pub fn get_uid(&mut self, delay: &mut Delay) -> Result<u64, Error> {
+    pub fn get_uid(&mut self, delay: &mut DELAY) -> Result<u64, Error> {
         let mut id = 0u64;
         self.with_delay(delay, |pdev| unsafe {
             bindings::VL53LX_GetUID(pdev, &mut id)
         })?;
         Ok(id)
     }
-    pub fn wait_device_booted(&mut self, delay: &mut Delay) -> Result<(), Error> {
+    pub fn wait_device_booted(&mut self, delay: &mut DELAY) -> Result<(), Error> {
         self.with_delay(delay, |pdev| unsafe {
             bindings::VL53LX_WaitDeviceBooted(pdev)
         })?;
         Ok(())
     }
-    pub fn data_init(&mut self, delay: &mut Delay) -> Result<(), Error> {
+    pub fn data_init(&mut self, delay: &mut DELAY) -> Result<(), Error> {
         self.with_delay(delay, |pdev| unsafe { bindings::VL53LX_DataInit(pdev) })?;
         Ok(())
     }
@@ -88,7 +94,7 @@ where
         self.with_pdev(|pdev| unsafe { bindings::VL53LX_StartMeasurement(pdev) })?;
         Ok(())
     }
-    pub fn wait_measurement_data_ready(&mut self, delay: &mut Delay) -> Result<(), Error> {
+    pub fn wait_measurement_data_ready(&mut self, delay: &mut DELAY) -> Result<(), Error> {
         self.with_delay(delay, |pdev| unsafe {
             bindings::VL53LX_WaitMeasurementDataReady(pdev)
         })?;
@@ -125,11 +131,11 @@ where
             status => Err(Error::from(status)),
         }
     }
-    fn with_delay<F>(&mut self, delay: &mut Delay, f: F) -> Result<(), Error>
+    fn with_delay<F>(&mut self, delay: &mut DELAY, f: F) -> Result<(), Error>
     where
         F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
     {
-        let hardware_p = self.dev_t.hardware_p as *mut Hardware<I2C, XSHUT>;
+        let hardware_p = self.dev_t.hardware_p as *mut Hardware<I2C, XSHUT, DELAY>;
         let hardware = unsafe { hardware_p.as_mut() }.unwrap();
         hardware.delay_p = delay;
         let result = self.with_pdev(f);

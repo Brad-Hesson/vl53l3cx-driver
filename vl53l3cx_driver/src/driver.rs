@@ -1,23 +1,21 @@
 use crate::bindings::{VL53LX_Dev_t, VL53LX_Error};
-use core::slice;
-use stm32l4xx_hal::{
-    delay::Delay,
-    i2c,
-    prelude::{
-        _embedded_hal_blocking_i2c_Read as Read, _embedded_hal_blocking_i2c_Write as Write, *,
-    },
+use ::core::slice;
+use ::embedded_hal::blocking::{
+    delay::DelayUs,
+    i2c::{Read, Write},
 };
 
-pub struct Hardware<I2C, XSHUT> {
+pub struct Hardware<I2C, XSHUT, DELAY> {
     pub i2c_address: u8,
     pub i2c: I2C,
     pub xshut_pin: XSHUT,
-    pub delay_p: *mut Delay,
+    pub delay_p: *mut DELAY,
 }
 
-impl<I2C, XSHUT> Hardware<I2C, XSHUT>
+impl<I2C, XSHUT, DELAY> Hardware<I2C, XSHUT, DELAY>
 where
-    I2C: Write<Error = i2c::Error> + Read<Error = i2c::Error>,
+    I2C: Write + Read,
+    DELAY: DelayUs<u32>,
 {
     pub extern "C" fn read(
         pdev: *mut VL53LX_Dev_t,
