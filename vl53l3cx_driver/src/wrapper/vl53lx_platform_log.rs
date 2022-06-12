@@ -90,12 +90,6 @@ unsafe fn write_cstr_formatted(dst: &mut CharPtr, src: &mut CharPtr, args: &mut 
     }
 }
 
-unsafe fn write_cstr(dst: &mut CharPtr, src: &mut CharPtr) {
-    while src.peek() != 0 {
-        write!(dst, "{}", src.pop() as char).unwrap();
-    }
-}
-
 unsafe fn write_format_specifier(dst: &mut CharPtr, src: &mut CharPtr, args: &mut VaListImpl) {
     src.pop();
     if src.peek() as char == '%' {
@@ -113,7 +107,10 @@ unsafe fn write_format_specifier(dst: &mut CharPtr, src: &mut CharPtr, args: &mu
                     break;
                 }
                 's' => {
-                    write_cstr(dst, &mut args.arg::<*mut u8>().into());
+                    let mut src = CharPtr::from(args.arg::<*mut u8>());
+                    while src.peek() != 0 {
+                        write!(dst, "{}", src.pop() as char).unwrap();
+                    }
                     break;
                 }
                 'l' => {
@@ -142,7 +139,6 @@ enum Level {
     Vl53LxTraceLevelAll,
     Vl53LxTraceLevelIgnore,
 }
-
 impl From<u32> for Level {
     fn from(v: u32) -> Self {
         match v {
@@ -164,7 +160,6 @@ enum Function {
     Vl53LxTraceFunctionI2C,
     Vl53LxTraceFunctionAll,
 }
-
 impl From<u32> for Function {
     fn from(v: u32) -> Self {
         match v {
@@ -175,6 +170,7 @@ impl From<u32> for Function {
         }
     }
 }
+
 #[derive(Debug)]
 enum Module {
     Vl53LxTraceModuleNone,
