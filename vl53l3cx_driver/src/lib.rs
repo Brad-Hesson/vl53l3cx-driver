@@ -23,9 +23,8 @@ mod bindings {
     #![allow(dead_code)]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
-pub use bindings::VL53LX_MultiRangingData_t;
-pub use bindings::VL53LX_TargetRangeData_t;
-use bindings::{VL53LX_Dev_t, VL53LX_Error};
+use crate::bindings::{VL53LX_Dev_t, VL53LX_Error};
+pub use crate::bindings::{VL53LX_MultiRangingData_t, VL53LX_TargetRangeData_t};
 
 pub struct VL53L3CX<I2C, XSHUT, DELAY>
 where
