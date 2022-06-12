@@ -17,50 +17,51 @@ pub struct Hardware<I2C, XSHUT> {
 
 impl<I2C, XSHUT> Hardware<I2C, XSHUT>
 where
-I2C: Write<Error = i2c::Error> + Read<Error = i2c::Error>,
+    I2C: Write<Error = i2c::Error> + Read<Error = i2c::Error>,
 {
-    pub unsafe extern "C" fn read(
+    pub extern "C" fn read(
         pdev: *mut VL53LX_Dev_t,
         index: u16,
         data: *mut u8,
         count: u32,
     ) -> VL53LX_Error {
-        let hardware = ((*pdev).hardware_p as *mut Self).as_mut().unwrap();
+        let hardware = unsafe { ((*pdev).hardware_p as *mut Self).as_mut() }.unwrap();
         let buffer = [(index >> 8) as u8, index as u8];
         match hardware.i2c.write(hardware.i2c_address / 2, &buffer) {
             Err(_) => return -13,
             Ok(_) => {}
         };
-        let mut buffer = slice::from_raw_parts_mut(data, count as usize);
+        let mut buffer = unsafe { slice::from_raw_parts_mut(data, count as usize) };
         match hardware.i2c.read(hardware.i2c_address / 2, &mut buffer) {
             Err(_) => return -13,
             Ok(_) => return 0,
         };
     }
-    pub unsafe extern "C" fn write(
+    pub extern "C" fn write(
         pdev: *mut VL53LX_Dev_t,
         index: u16,
         data: *mut u8,
         count: u32,
     ) -> VL53LX_Error {
-        let hardware = ((*pdev).hardware_p as *mut Self).as_mut().unwrap();
+        let hardware = unsafe { ((*pdev).hardware_p as *mut Self).as_mut() }.unwrap();
         let mut buffer = [0u8; 256];
         buffer[0] = (index >> 8) as u8;
         buffer[1] = index as u8;
         let mut i = 2;
-        for byte in slice::from_raw_parts(data, count as usize) {
+        for byte in unsafe { slice::from_raw_parts(data, count as usize) } {
             buffer[i] = *byte;
             i += 1;
         }
-        let buffer_slice = slice::from_raw_parts(&buffer as *const u8, (count + 2) as usize);
+        let buffer_slice =
+            unsafe { slice::from_raw_parts(&buffer as *const u8, (count + 2) as usize) };
         match hardware.i2c.write(hardware.i2c_address / 2, buffer_slice) {
             Err(_) => return -13,
             Ok(_) => return 0,
         }
     }
-    pub unsafe extern "C" fn wait_us(pdev: *mut VL53LX_Dev_t, count: u32) -> VL53LX_Error {
-        let hardware = ((*pdev).hardware_p as *mut Self).as_mut().unwrap();
-        match hardware.delay_p.as_mut() {
+    pub extern "C" fn wait_us(pdev: *mut VL53LX_Dev_t, count: u32) -> VL53LX_Error {
+        let hardware = unsafe { ((*pdev).hardware_p as *mut Self).as_mut() }.unwrap();
+        match unsafe { hardware.delay_p.as_mut() } {
             None => panic!("wait function requires delay to be loaded"),
             Some(delay) => {
                 delay.delay_us(count);
