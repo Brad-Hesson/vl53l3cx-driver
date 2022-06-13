@@ -1,5 +1,42 @@
 use crate::bindings;
 
+impl Default for bindings::VL53LX_AdditionalData_t {
+    fn default() -> Self {
+        Self {
+            preset_mode: Default::default(),
+            zone_preset: Default::default(),
+            measurement_mode: Default::default(),
+            offset_calibration_mode: Default::default(),
+            offset_correction_mode: Default::default(),
+            dmax_mode: Default::default(),
+            phasecal_config_timeout_us: Default::default(),
+            mm_config_timeout_us: Default::default(),
+            range_config_timeout_us: Default::default(),
+            inter_measurement_period_ms: Default::default(),
+            dss_config__target_total_rate_mcps: Default::default(),
+            VL53LX_p_006: Default::default(),
+        }
+    }
+}
+impl Default for bindings::VL53LX_DeviceInfo_t {
+    fn default() -> Self {
+        Self {
+            ProductType: Default::default(),
+            ProductRevisionMajor: Default::default(),
+            ProductRevisionMinor: Default::default(),
+        }
+    }
+}
+impl Default for bindings::VL53LX_Version_t {
+    fn default() -> Self {
+        Self {
+            revision: Default::default(),
+            major: Default::default(),
+            minor: Default::default(),
+            build: Default::default(),
+        }
+    }
+}
 impl Default for bindings::VL53LX_MultiRangingData_t {
     fn default() -> Self {
         Self {

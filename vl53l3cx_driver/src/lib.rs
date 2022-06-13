@@ -23,8 +23,11 @@ mod bindings {
     #![allow(dead_code)]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
+pub use crate::bindings::{
+    VL53LX_AdditionalData_t, VL53LX_DeviceInfo_t, VL53LX_MultiRangingData_t,
+    VL53LX_TargetRangeData_t, VL53LX_Version_t,
+};
 use crate::bindings::{VL53LX_Dev_t, VL53LX_Error};
-pub use crate::bindings::{VL53LX_MultiRangingData_t, VL53LX_TargetRangeData_t};
 
 pub struct VL53L3CX<I2C, XSHUT, DELAY>
 where
@@ -72,6 +75,24 @@ where
         self.with_pdev(|pdev| unsafe { bindings::VL53LX_RdByte(pdev, index, &mut data) })?;
         Ok(data)
     }
+    pub fn get_version(&mut self) -> Result<VL53LX_Version_t, Error> {
+        let mut version = VL53LX_Version_t::default();
+        self.with_pdev(|_| unsafe { bindings::VL53LX_GetVersion(&mut version) })?;
+        Ok(version)
+    }
+    pub fn get_product_revision(&mut self) -> Result<(u8, u8), Error> {
+        let mut major = 0u8;
+        let mut minor = 0u8;
+        self.with_pdev(|pdev| unsafe {
+            bindings::VL53LX_GetProductRevision(pdev, &mut major, &mut minor)
+        })?;
+        Ok((major, minor))
+    }
+    pub fn get_device_info(&mut self) -> Result<VL53LX_DeviceInfo_t, Error> {
+        let mut dev_info = VL53LX_DeviceInfo_t::default();
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_GetDeviceInfo(pdev, &mut dev_info) })?;
+        Ok(dev_info)
+    }
     pub fn get_uid(&mut self, delay: &mut DELAY) -> Result<u64, Error> {
         let mut id = 0u64;
         self.with_delay(delay, |pdev| unsafe {
@@ -79,19 +100,70 @@ where
         })?;
         Ok(id)
     }
-    pub fn wait_device_booted(&mut self, delay: &mut DELAY) -> Result<(), Error> {
-        self.with_delay(delay, |pdev| unsafe {
-            bindings::VL53LX_WaitDeviceBooted(pdev)
-        })?;
+    pub fn set_device_address(&mut self, address: u8) -> Result<(), Error> {
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_SetDeviceAddress(pdev, address) })?;
         Ok(())
     }
     pub fn data_init(&mut self, delay: &mut DELAY) -> Result<(), Error> {
         self.with_delay(delay, |pdev| unsafe { bindings::VL53LX_DataInit(pdev) })?;
         Ok(())
     }
+    pub fn wait_device_booted(&mut self, delay: &mut DELAY) -> Result<(), Error> {
+        self.with_delay(delay, |pdev| unsafe {
+            bindings::VL53LX_WaitDeviceBooted(pdev)
+        })?;
+        Ok(())
+    }
+    pub fn set_distance_mode(&mut self, mode: DistanceMode) -> Result<(), Error> {
+        let mode_num = match mode {
+            DistanceMode::Short => 1,
+            DistanceMode::Medium => 2,
+            DistanceMode::Long => 3,
+        };
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_SetDistanceMode(pdev, mode_num) })?;
+        Ok(())
+    }
+    pub fn get_distance_mode(&mut self) -> Result<DistanceMode, Error> {
+        let mut mode = 0u8;
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_GetDistanceMode(pdev, &mut mode) })?;
+        Ok(match mode {
+            1 => DistanceMode::Short,
+            2 => DistanceMode::Medium,
+            3 => DistanceMode::Long,
+            _ => unimplemented!(),
+        })
+    }
+    pub fn set_measurement_timing_budget_ms(&mut self, ms: u32) -> Result<(), Error> {
+        self.with_pdev(|pdev| unsafe {
+            bindings::VL53LX_SetMeasurementTimingBudgetMicroSeconds(pdev, ms * 1000)
+        })?;
+        Ok(())
+    }
+    pub fn get_measurement_timing_budget_ms(&mut self) -> Result<u32, Error> {
+        let mut ms = 0u32;
+        self.with_pdev(|pdev| unsafe {
+            bindings::VL53LX_GetMeasurementTimingBudgetMicroSeconds(pdev, &mut ms)
+        })?;
+        Ok(ms / 1000)
+    }
     pub fn start_measurement(&mut self) -> Result<(), Error> {
         self.with_pdev(|pdev| unsafe { bindings::VL53LX_StartMeasurement(pdev) })?;
         Ok(())
+    }
+    pub fn stop_measurement(&mut self) -> Result<(), Error> {
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_StopMeasurement(pdev) })?;
+        Ok(())
+    }
+    pub fn clear_interrupt_and_start_measurement(&mut self) -> Result<(), Error> {
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_ClearInterruptAndStartMeasurement(pdev) })?;
+        Ok(())
+    }
+    pub fn get_measurement_data_ready(&mut self) -> Result<bool, Error> {
+        let mut data = 0u8;
+        self.with_pdev(|pdev| unsafe {
+            bindings::VL53LX_GetMeasurementDataReady(pdev, &mut data)
+        })?;
+        Ok(data == 1)
     }
     pub fn wait_measurement_data_ready(&mut self, delay: &mut DELAY) -> Result<(), Error> {
         self.with_delay(delay, |pdev| unsafe {
@@ -104,22 +176,10 @@ where
         self.with_pdev(|pdev| unsafe { bindings::VL53LX_GetMultiRangingData(pdev, &mut data) })?;
         Ok(data)
     }
-    pub fn get_measurement_data_ready(&mut self) -> Result<bool, Error> {
-        let mut data = 0u8;
-        self.with_pdev(|pdev| unsafe {
-            bindings::VL53LX_GetMeasurementDataReady(pdev, &mut data)
-        })?;
-        Ok(data == 1)
-    }
-    pub fn set_measurement_timing_budget_ms(&mut self, ms: u32) -> Result<(), Error> {
-        self.with_pdev(|pdev| unsafe {
-            bindings::VL53LX_SetMeasurementTimingBudgetMicroSeconds(pdev, ms * 1000)
-        })?;
-        Ok(())
-    }
-    pub fn set_distance_mode(&mut self, mode: u8) -> Result<(), Error> {
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_SetDistanceMode(pdev, mode) })?;
-        Ok(())
+    pub fn get_additional_data(&mut self) -> Result<VL53LX_AdditionalData_t, Error> {
+        let mut data = VL53LX_AdditionalData_t::default();
+        self.with_pdev(|pdev| unsafe { bindings::VL53LX_GetAdditionalData(pdev, &mut data) })?;
+        Ok(data)
     }
     fn with_pdev<F>(&mut self, mut f: F) -> Result<(), Error>
     where
@@ -141,6 +201,13 @@ where
         hardware.delay_p = ptr::null_mut();
         result
     }
+}
+
+#[derive(Debug)]
+pub enum DistanceMode {
+    Short,
+    Medium,
+    Long,
 }
 
 #[derive(Debug, Clone, Copy)]
