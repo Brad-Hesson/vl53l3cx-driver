@@ -99,7 +99,9 @@ fn main() -> ! {
     sensor.enable();
     sensor.wait_device_booted(&mut delay).unwrap();
     sensor.data_init(&mut delay).unwrap();
-    sensor.set_distance_mode(3).unwrap();
+    sensor
+        .set_distance_mode(vl53l3cx_driver::DistanceMode::Long)
+        .unwrap();
     sensor.set_measurement_timing_budget_ms(100).unwrap();
 
     // ---------run the main loop----------
