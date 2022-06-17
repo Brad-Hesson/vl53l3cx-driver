@@ -3,11 +3,11 @@ use std::fs;
 use std::path::PathBuf;
 
 fn main() {
-    let file = PathBuf::from("src/core/src/vl53lx_api.c");
-    let search_paths = vec![
-        PathBuf::from("src/wrapper"),
-        PathBuf::from("src/core/src"),
-        PathBuf::from("src/core/inc"),
+    let file: PathBuf = ["src", "core", "src", "vl53lx_api.c"].iter().collect();
+    let search_paths: Vec<PathBuf> = vec![
+        ["src", "wrapper"].iter().collect(),
+        ["src", "core", "src"].iter().collect(),
+        ["src", "core", "inc"].iter().collect(),
     ];
     run_bindgen(file.clone(), search_paths.clone());
     compile_c_code(file, search_paths);
