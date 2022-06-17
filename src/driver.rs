@@ -25,15 +25,18 @@ where
     ) -> VL53LX_Error {
         let hardware = unsafe { ((*pdev).hardware_p as *mut Self).as_mut() }.unwrap();
         let buffer = [(index >> 8) as u8, index as u8];
-        match hardware.i2c.write(hardware.i2c_address / 2, &buffer) {
-            Err(_) => return -13,
-            Ok(_) => {}
-        };
-        let mut buffer = unsafe { slice::from_raw_parts_mut(data, count as usize) };
-        match hardware.i2c.read(hardware.i2c_address / 2, &mut buffer) {
-            Err(_) => return -13,
-            Ok(_) => return 0,
-        };
+        if hardware
+            .i2c
+            .write(hardware.i2c_address / 2, &buffer)
+            .is_err()
+        {
+            return -13;
+        }
+        let buffer = unsafe { slice::from_raw_parts_mut(data, count as usize) };
+        match hardware.i2c.read(hardware.i2c_address / 2, buffer) {
+            Err(_) => -13,
+            Ok(_) => 0,
+        }
     }
     pub extern "C" fn write(
         pdev: *mut VL53LX_Dev_t,
@@ -53,8 +56,8 @@ where
         let buffer_slice =
             unsafe { slice::from_raw_parts(&buffer as *const u8, (count + 2) as usize) };
         match hardware.i2c.write(hardware.i2c_address / 2, buffer_slice) {
-            Err(_) => return -13,
-            Ok(_) => return 0,
+            Err(_) => -13,
+            Ok(_) => 0,
         }
     }
     pub extern "C" fn wait_us(pdev: *mut VL53LX_Dev_t, count: u32) -> VL53LX_Error {
