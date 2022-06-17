@@ -1,3 +1,4 @@
+#![allow(clippy::derivable_impls)]
 use crate::bindings;
 
 impl Default for bindings::VL53LX_AdditionalData_t {

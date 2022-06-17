@@ -16,10 +16,10 @@ pub unsafe extern "C" fn VL53LX_trace_print_module_function(
     src_p: *mut u8,
     mut args: ...
 ) {
-    if !!!DEBUG {
+    if !DEBUG {
         return;
     }
-    if Level::from(level) != Level::Vl53LxTraceLevelDebug {
+    if TraceLevel::from(level) != TraceLevel::Debug {
         return;
     }
     let mut dst_buf = [0u8; 256];
@@ -130,25 +130,25 @@ unsafe fn write_format_specifier(dst: &mut CharPtr, src: &mut CharPtr, args: &mu
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Level {
-    Vl53LxTraceLevelNone,
-    Vl53LxTraceLevelErrors,
-    Vl53LxTraceLevelWarning,
-    Vl53LxTraceLevelInfo,
-    Vl53LxTraceLevelDebug,
-    Vl53LxTraceLevelAll,
-    Vl53LxTraceLevelIgnore,
+enum TraceLevel {
+    None,
+    Errors,
+    Warning,
+    Info,
+    Debug,
+    All,
+    Ignore,
 }
-impl From<u32> for Level {
+impl From<u32> for TraceLevel {
     fn from(v: u32) -> Self {
         match v {
-            0x00000000 => Self::Vl53LxTraceLevelNone,
-            0x00000001 => Self::Vl53LxTraceLevelErrors,
-            0x00000002 => Self::Vl53LxTraceLevelWarning,
-            0x00000004 => Self::Vl53LxTraceLevelInfo,
-            0x00000008 => Self::Vl53LxTraceLevelDebug,
-            0x00000010 => Self::Vl53LxTraceLevelAll,
-            0x00000020 => Self::Vl53LxTraceLevelIgnore,
+            0x00000000 => Self::None,
+            0x00000001 => Self::Errors,
+            0x00000002 => Self::Warning,
+            0x00000004 => Self::Info,
+            0x00000008 => Self::Debug,
+            0x00000010 => Self::All,
+            0x00000020 => Self::Ignore,
             _ => unimplemented!(),
         }
     }
@@ -172,45 +172,45 @@ impl From<u32> for Function {
 }
 
 #[derive(Debug)]
-enum Module {
-    Vl53LxTraceModuleNone,
-    Vl53LxTraceModuleApi,
-    Vl53LxTraceModuleCore,
-    Vl53LxTraceModuleProtected,
-    Vl53LxTraceModuleHistogram,
-    Vl53LxTraceModuleRegisters,
-    Vl53LxTraceModulePlatform,
-    Vl53LxTraceModuleNvm,
-    Vl53LxTraceModuleCalibrationData,
-    Vl53LxTraceModuleNvmData,
-    Vl53LxTraceModuleHistogramData,
-    Vl53LxTraceModuleRangeResultsData,
-    Vl53LxTraceModuleXtalkData,
-    Vl53LxTraceModuleOffsetData,
-    Vl53LxTraceModuleDataInit,
-    Vl53LxTraceModuleRefSpadChar,
-    Vl53LxTraceModuleSpadRateMap,
+enum TraceModule {
+    None,
+    Api,
+    Core,
+    Protected,
+    Histogram,
+    Registers,
+    Platform,
+    Nvm,
+    CalibrationData,
+    NvmData,
+    HistogramData,
+    RangeResultsData,
+    XtalkData,
+    OffsetData,
+    DataInit,
+    RefSpadChar,
+    SpadRateMap,
 }
-impl From<u32> for Module {
+impl From<u32> for TraceModule {
     fn from(v: u32) -> Self {
         match v {
-            0x00000000 => Self::Vl53LxTraceModuleNone,
-            0x00000001 => Self::Vl53LxTraceModuleApi,
-            0x00000002 => Self::Vl53LxTraceModuleCore,
-            0x00000004 => Self::Vl53LxTraceModuleProtected,
-            0x00000008 => Self::Vl53LxTraceModuleHistogram,
-            0x00000010 => Self::Vl53LxTraceModuleRegisters,
-            0x00000020 => Self::Vl53LxTraceModulePlatform,
-            0x00000040 => Self::Vl53LxTraceModuleNvm,
-            0x00000080 => Self::Vl53LxTraceModuleCalibrationData,
-            0x00000100 => Self::Vl53LxTraceModuleNvmData,
-            0x00000200 => Self::Vl53LxTraceModuleHistogramData,
-            0x00000400 => Self::Vl53LxTraceModuleRangeResultsData,
-            0x00000800 => Self::Vl53LxTraceModuleXtalkData,
-            0x00001000 => Self::Vl53LxTraceModuleOffsetData,
-            0x00002000 => Self::Vl53LxTraceModuleDataInit,
-            0x00004000 => Self::Vl53LxTraceModuleRefSpadChar,
-            0x00008000 => Self::Vl53LxTraceModuleSpadRateMap,
+            0x00000000 => Self::None,
+            0x00000001 => Self::Api,
+            0x00000002 => Self::Core,
+            0x00000004 => Self::Protected,
+            0x00000008 => Self::Histogram,
+            0x00000010 => Self::Registers,
+            0x00000020 => Self::Platform,
+            0x00000040 => Self::Nvm,
+            0x00000080 => Self::CalibrationData,
+            0x00000100 => Self::NvmData,
+            0x00000200 => Self::HistogramData,
+            0x00000400 => Self::RangeResultsData,
+            0x00000800 => Self::XtalkData,
+            0x00001000 => Self::OffsetData,
+            0x00002000 => Self::DataInit,
+            0x00004000 => Self::RefSpadChar,
+            0x00008000 => Self::SpadRateMap,
             _ => unimplemented!(),
         }
     }
