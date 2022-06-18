@@ -12,6 +12,38 @@ env:
 jobs:
   check:
     name: Check
+    matrix:
+      os: [ubuntu-latest, windows-latest, macos-latest]
+      target: [thumbv7em-none-eabihf]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          target: ${{ matrix.target }}
+          override: true
+      
+      - name: Install Clang
+        uses: egor-tensin/setup-clang@v1
+      
+      - name: Install Arm ABI
+        uses: fiam/arm-none-eabi-gcc@v1
+        with:
+          release: '9-2019-q4'
+
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --target=${{ matrix.target }}
+
+  test:
+    name: Test Suite
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -33,25 +65,6 @@ jobs:
         with:
           release: '9-2019-q4'
 
-      - name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
-
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
@@ -68,9 +81,18 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: nightly
+          target: thumbv7em-none-eabihf
           override: true
           components: rustfmt, clippy
+      
+      - name: Install Clang
+        uses: egor-tensin/setup-clang@v1
+      
+      - name: Install Arm ABI
+        uses: fiam/arm-none-eabi-gcc@v1
+        with:
+          release: '9-2019-q4'
 
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
