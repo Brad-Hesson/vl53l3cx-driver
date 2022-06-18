@@ -30,7 +30,7 @@
 #define _VL53LX_PLATFORM_H_
 
 #include <vl53lx_platform_log.h>
-#include "VL53Lx_ll_def.h"
+#include "vl53lx_ll_def.h"
 #include <stdint.h>
 #include "vl53lx_error_codes.h"
 
