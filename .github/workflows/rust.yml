@@ -129,10 +129,10 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --target=thumbv7em-none-eabihf --all -- --check
+          args: --all -- --target=thumbv7em-none-eabihf --check
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --target=thumbv7em-none-eabihf -- -D warnings
+          args: -- --target=thumbv7em-none-eabihf -D warnings
