@@ -12,9 +12,10 @@ env:
 jobs:
   check:
     name: Check
-    matrix:
-      os: [ubuntu-latest, windows-latest, macos-latest]
-      target: [thumbv7em-none-eabihf]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        target: [thumbv7em-none-eabihf]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
