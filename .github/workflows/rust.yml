@@ -10,47 +10,14 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    name: Build
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        target: ["thumbv6m-none-eabi","thumbv7m-none-eabi","thumbv7em-none-eabi","thumbv7em-none-eabihf","thumbv8m.base-none-eabi","thumbv8m.main-none-eabi","thumbv8m.main-none-eabihf"]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
-
-      - name: Install toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          target: ${{ matrix.target }}
-          override: true
-      
-      - name: Install Clang
-        uses: egor-tensin/setup-clang@v1
-      
-      - name: Install Arm ABI
-        uses: fiam/arm-none-eabi-gcc@v1
-        with:
-          release: '9-2019-q4'
-
-      - name: Run cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --target=${{ matrix.target }}
-
   check:
     name: Cargo Check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout sources
+      - name: Checkout Sources
         uses: actions/checkout@v2
 
-      - name: Install stable toolchain
+      - name: Install Toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -66,14 +33,14 @@ jobs:
         with:
           release: '9-2019-q4'
 
-      - name: Run cargo check
+      - name: Run Cargo Check
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --target=thumbv7em-none-eabihf
 
   test:
-    name: Test Suite
+    name: Cargo Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -95,19 +62,19 @@ jobs:
         with:
           release: '9-2019-q4'
 
-      - name: Run cargo test
+      - name: Run Cargo Test
         uses: actions-rs/cargo@v1
         with:
           command: test
 
-  lints:
-    name: Lints
+  fmt:
+    name: Cargo Fmt
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout sources
+      - name: Checkout Sources
         uses: actions/checkout@v2
 
-      - name: Install toolchain
+      - name: Install Toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -124,14 +91,71 @@ jobs:
         with:
           release: '9-2019-q4'
 
-      - name: Run cargo fmt
+      - name: Run Cargo Fmt
         uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
 
-      - name: Run cargo clippy
+  clippy:
+    name: Cargo Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v2
+
+      - name: Install Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          target: thumbv7em-none-eabihf
+          override: true
+          components: rustfmt, clippy
+      
+      - name: Install Clang
+        uses: egor-tensin/setup-clang@v1
+      
+      - name: Install Arm ABI
+        uses: fiam/arm-none-eabi-gcc@v1
+        with:
+          release: '9-2019-q4'
+
+      - name: Run Cargo Clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: --target=thumbv7em-none-eabihf -- -D warnings
+
+  build:
+    name: Cargo Build
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        target: ["thumbv6m-none-eabi","thumbv7m-none-eabi","thumbv7em-none-eabi","thumbv7em-none-eabihf","thumbv8m.base-none-eabi","thumbv8m.main-none-eabi","thumbv8m.main-none-eabihf"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v2
+
+      - name: Install Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          target: ${{ matrix.target }}
+          override: true
+      
+      - name: Install Clang
+        uses: egor-tensin/setup-clang@v1
+      
+      - name: Install Arm ABI
+        uses: fiam/arm-none-eabi-gcc@v1
+        with:
+          release: '9-2019-q4'
+
+      - name: Run Cargo Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --target=${{ matrix.target }}
