@@ -30,6 +30,8 @@ jobs:
       
       - name: Install Arm ABI
         uses: fiam/arm-none-eabi-gcc@v1
+        with:
+          release: '9-2019-q4'
 
       - name: Run cargo check
         uses: actions-rs/cargo@v1
