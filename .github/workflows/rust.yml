@@ -99,7 +99,6 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --target=thumbv7em-none-eabihf
 
   lints:
     name: Lints
@@ -129,10 +128,10 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --all -- --target=thumbv7em-none-eabihf --check
+          args: --target=thumbv7em-none-eabihf --all -- --check
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- --target=thumbv7em-none-eabihf -D warnings
+          args: --target=thumbv7em-none-eabihf -- -D warnings
