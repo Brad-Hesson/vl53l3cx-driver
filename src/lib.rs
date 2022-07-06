@@ -51,7 +51,7 @@ where
             xshut_pin,
             delay_p: ptr::null_mut(),
         };
-        let mut _self = Self {
+        Self {
             hardware,
             dev_t: VL53LX_Dev_t {
                 hardware_p: ptr::null_mut(),
@@ -60,9 +60,7 @@ where
                 wait_us_f: Some(Hardware::<I2C, XSHUT, DELAY>::wait_us),
                 Data: Default::default(),
             },
-        };
-        _self.dev_t.hardware_p = ptr::addr_of_mut!(_self.hardware) as *mut c_void;
-        _self
+        }
     }
     pub fn enable(&mut self) {
         self.hardware
@@ -185,20 +183,21 @@ where
     where
         F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
     {
-        match f(&mut self.dev_t) {
+        self.dev_t.hardware_p = ptr::addr_of_mut!(self.hardware) as *mut c_void;
+        let res = match f(&mut self.dev_t) {
             0 => Ok(()),
             status => Err(Error::from(status)),
-        }
+        };
+        self.dev_t.hardware_p = ptr::null_mut();
+        res
     }
     fn with_delay<F>(&mut self, delay: &mut DELAY, f: F) -> Result<(), Error>
     where
         F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
     {
-        let hardware_p = self.dev_t.hardware_p as *mut Hardware<I2C, XSHUT, DELAY>;
-        let hardware = unsafe { hardware_p.as_mut() }.unwrap();
-        hardware.delay_p = delay;
+        self.hardware.delay_p = delay;
         let result = self.with_pdev(f);
-        hardware.delay_p = ptr::null_mut();
+        self.hardware.delay_p = ptr::null_mut();
         result
     }
 }
