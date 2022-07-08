@@ -45,14 +45,13 @@ where
     DELAY: DelayUs<u32>,
 {
     pub fn new(i2c: I2C, i2c_address: u8, xshut_pin: XSHUT) -> Self {
-        let hardware = Hardware::<I2C, XSHUT, DELAY> {
-            i2c_address,
-            i2c,
-            xshut_pin,
-            delay_p: ptr::null_mut(),
-        };
         Self {
-            hardware,
+            hardware: Hardware::<I2C, XSHUT, DELAY> {
+                i2c_address,
+                i2c,
+                xshut_pin,
+                delay_p: ptr::null_mut(),
+            },
             dev_t: VL53LX_Dev_t {
                 hardware_p: ptr::null_mut(),
                 read_f: Some(Hardware::<I2C, XSHUT, DELAY>::read),

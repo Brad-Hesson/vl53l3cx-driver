@@ -23,7 +23,8 @@ where
         data: *mut u8,
         count: u32,
     ) -> VL53LX_Error {
-        let hardware = unsafe { ((*pdev).hardware_p as *mut Self).as_mut() }.unwrap();
+        let hardware = unsafe { ((*pdev).hardware_p as *mut Self).as_mut() }
+            .expect("hardware pointer must be loaded");
         let buffer = [(index >> 8) as u8, index as u8];
         if hardware
             .i2c
@@ -44,7 +45,8 @@ where
         data: *mut u8,
         count: u32,
     ) -> VL53LX_Error {
-        let hardware = unsafe { ((*pdev).hardware_p as *mut Self).as_mut() }.unwrap();
+        let hardware = unsafe { ((*pdev).hardware_p as *mut Self).as_mut() }
+            .expect("hardware pointer must be loaded");
         let mut buffer = [0u8; 256];
         buffer[0] = (index >> 8) as u8;
         buffer[1] = index as u8;
@@ -61,13 +63,11 @@ where
         }
     }
     pub extern "C" fn wait_us(pdev: *mut VL53LX_Dev_t, count: u32) -> VL53LX_Error {
-        let hardware = unsafe { ((*pdev).hardware_p as *mut Self).as_mut() }.unwrap();
-        match unsafe { hardware.delay_p.as_mut() } {
-            None => panic!("wait function requires delay to be loaded"),
-            Some(delay) => {
-                delay.delay_us(count);
-                0
-            }
-        }
+        let hardware = unsafe { ((*pdev).hardware_p as *mut Self).as_mut() }
+            .expect("hardware pointer must be loaded");
+        let delay = unsafe { hardware.delay_p.as_mut() }
+            .expect("wait function requires delay to be loaded");
+        delay.delay_us(count);
+        0
     }
 }
