@@ -4,7 +4,7 @@ use rtt_target::rprint;
 const DEBUG: bool = false;
 
 #[no_mangle]
-pub unsafe extern "C" fn VL53LX_clock() -> u32 {
+pub extern "C" fn VL53LX_clock() -> u32 {
     0
 }
 

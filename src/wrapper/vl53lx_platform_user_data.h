@@ -38,12 +38,10 @@
 
 #include "vl53lx_def.h"
 
+/// <div rustbindgen hide></div>
 typedef struct VL53LX_Dev_t {
-	VL53LX_DevData_t   Data;
 	void* hardware_p;
-	VL53LX_Error (*read_f)(struct VL53LX_Dev_t*, uint16_t, uint8_t*, uint32_t);
-	VL53LX_Error (*write_f)(struct VL53LX_Dev_t*, uint16_t, uint8_t*, uint32_t);
-	VL53LX_Error (*wait_us_f)(struct VL53LX_Dev_t*, uint32_t);
+	VL53LX_DevData_t   Data;
 } VL53LX_Dev_t;
 
 typedef VL53LX_Dev_t* VL53LX_DEV;

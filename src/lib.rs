@@ -1,13 +1,21 @@
 #![no_std]
 #![feature(c_variadic)]
 
+mod bindings;
 mod defaults;
-mod driver;
+mod hardware;
 mod wrapper;
 
-use crate::driver::Hardware;
+pub use crate::bindings::{
+    VL53LX_AdditionalData_t, VL53LX_DeviceInfo_t, VL53LX_MultiRangingData_t,
+    VL53LX_TargetRangeData_t, VL53LX_Version_t,
+};
+use crate::{
+    bindings::VL53LX_Error,
+    hardware::{Hardware, NullHardware},
+    wrapper::vl53lx_platform_user_data::VL53LX_Dev_t,
+};
 use ::core::{convert::Infallible, ptr};
-use ::cty::c_void;
 use ::embedded_hal::{
     blocking::{
         delay::DelayUs,
@@ -15,19 +23,6 @@ use ::embedded_hal::{
     },
     digital::v2::OutputPin,
 };
-
-mod bindings {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(dead_code)]
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-}
-pub use crate::bindings::{
-    VL53LX_AdditionalData_t, VL53LX_DeviceInfo_t, VL53LX_MultiRangingData_t,
-    VL53LX_TargetRangeData_t, VL53LX_Version_t,
-};
-use crate::bindings::{VL53LX_Dev_t, VL53LX_Error};
 
 pub struct VL53L3CX<I2C, XSHUT, DELAY>
 where
@@ -38,25 +33,22 @@ where
     dev_t: VL53LX_Dev_t,
     hardware: Hardware<I2C, XSHUT, DELAY>,
 }
-impl<I2C, XSHUT, DELAY> VL53L3CX<I2C, XSHUT, DELAY>
+impl<'a, I2C, XSHUT, DELAY> VL53L3CX<I2C, XSHUT, DELAY>
 where
-    I2C: Write + Read,
-    XSHUT: OutputPin<Error = Infallible>,
-    DELAY: DelayUs<u32>,
+    I2C: Write + Read + 'static,
+    XSHUT: OutputPin<Error = Infallible> + 'static,
+    DELAY: DelayUs<u32> + 'static,
 {
     pub fn new(i2c: I2C, i2c_address: u8, xshut_pin: XSHUT) -> Self {
         Self {
-            hardware: Hardware::<I2C, XSHUT, DELAY> {
+            hardware: Hardware {
                 i2c_address,
                 i2c,
                 xshut_pin,
                 delay_p: ptr::null_mut(),
             },
             dev_t: VL53LX_Dev_t {
-                hardware_p: ptr::null_mut(),
-                read_f: Some(Hardware::<I2C, XSHUT, DELAY>::read),
-                write_f: Some(Hardware::<I2C, XSHUT, DELAY>::write),
-                wait_us_f: Some(Hardware::<I2C, XSHUT, DELAY>::wait_us),
+                hardware_p: &mut NullHardware,
                 Data: Default::default(),
             },
         }
@@ -162,7 +154,10 @@ where
         })?;
         Ok(data == 1)
     }
-    pub fn wait_measurement_data_ready(&mut self, delay: &mut DELAY) -> Result<(), Error> {
+    pub fn wait_measurement_data_ready<'f: 'a>(
+        &'f mut self,
+        delay: &'f mut DELAY,
+    ) -> Result<(), Error> {
         self.with_delay(delay, |pdev| unsafe {
             bindings::VL53LX_WaitMeasurementDataReady(pdev)
         })?;
@@ -182,12 +177,12 @@ where
     where
         F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
     {
-        self.dev_t.hardware_p = ptr::addr_of_mut!(self.hardware) as *mut c_void;
+        self.dev_t.hardware_p = ptr::addr_of_mut!(self.hardware);
         let res = match f(&mut self.dev_t) {
             0 => Ok(()),
             status => Err(Error::from(status)),
         };
-        self.dev_t.hardware_p = ptr::null_mut();
+        self.dev_t.hardware_p = &mut NullHardware;
         res
     }
     fn with_delay<F>(&mut self, delay: &mut DELAY, f: F) -> Result<(), Error>
