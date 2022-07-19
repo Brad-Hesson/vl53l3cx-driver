@@ -53,9 +53,10 @@ pub extern "C" fn VL53LX_WrByte(pdev: &mut VL53LX_Dev_t, index: u16, data: u8) -
     if DEBUG {
         rprintln!("VL53LX_WrByte: 0x{:04X} <= 0x{:02X}", index, data);
     }
+    let data = unsafe { slice::from_raw_parts(&data as *const u8, 1) };
     unsafe { pdev.hardware_p.as_mut() }
         .unwrap()
-        .write(index, &[data; 1])
+        .write(index, data)
 }
 
 #[no_mangle]
@@ -63,9 +64,10 @@ pub extern "C" fn VL53LX_WrWord(pdev: &mut VL53LX_Dev_t, index: u16, data: u16) 
     if DEBUG {
         rprintln!("VL53LX_WrWord: 0x{:04X} <= 0x{:04X}", index, data);
     }
+    let data = unsafe { slice::from_raw_parts(&data as *const u16 as *const u8, 2) };
     unsafe { pdev.hardware_p.as_mut() }
         .unwrap()
-        .write(index, &[(data >> 8) as u8, data as u8])
+        .write(index, data)
 }
 
 #[no_mangle]
@@ -73,15 +75,10 @@ pub extern "C" fn VL53LX_WrDWord(pdev: &mut VL53LX_Dev_t, index: u16, data: u32)
     if DEBUG {
         rprintln!("VL53LX_WrDWord: 0x{:04X} <= 0x{:08X}", index, data);
     }
-    let data = [
-        (data >> 24) as u8,
-        (data >> 16) as u8,
-        (data >> 8) as u8,
-        data as u8,
-    ];
+    let data = unsafe { slice::from_raw_parts(&data as *const u32 as *const u8, 4) };
     unsafe { pdev.hardware_p.as_mut() }
         .unwrap()
-        .write(index, &data)
+        .write(index, data)
 }
 
 #[no_mangle]
