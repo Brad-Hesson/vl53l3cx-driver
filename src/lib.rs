@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(c_variadic)]
+#![feature(c_variadic, type_changing_struct_update)]
 
 mod bindings;
 mod defaults;
@@ -19,11 +19,12 @@ use ::embedded_hal::{
     digital::v2::OutputPin,
 };
 
-pub struct VL53L3CX<'a, XSHUT, I2CT, DELAY> {
+pub struct VL53L3CX<'a, STATE, I2CT, XSHUT, DELAY> {
     xshut_pin: XSHUT,
     dev_t: VL53LX_Dev_t<'a>,
     i2ct: PhantomData<I2CT>,
     delay: PhantomData<DELAY>,
+    _state: STATE,
 }
 macro_rules! result {
     ($code:expr) => {
@@ -33,10 +34,12 @@ macro_rules! result {
         }
     };
 }
-impl<'a, XSHUT, I2CT, DELAY> VL53L3CX<'a, XSHUT, I2CT, DELAY>
+pub struct Enabled;
+pub struct Disabled;
+impl<'a, I2CT, XSHUT, DELAY> VL53L3CX<'a, Disabled, I2CT, XSHUT, DELAY>
 where
-    XSHUT: OutputPin<Error = Infallible>,
     I2CT: Read + Write + 'a,
+    XSHUT: OutputPin<Error = Infallible>,
     DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
 {
     pub fn new(i2c_address: u8, xshut_pin: XSHUT) -> Self {
@@ -50,25 +53,31 @@ where
             xshut_pin,
             i2ct: PhantomData,
             delay: PhantomData,
+            _state: Disabled,
         }
     }
-    pub fn enable(&mut self) {
+    pub fn into_enabled(mut self) -> VL53L3CX<'a, Enabled, I2CT, XSHUT, DELAY> {
         self.xshut_pin
             .set_high()
             .expect("setting pin state is infallible");
+        VL53L3CX {
+            _state: Enabled,
+            ..self
+        }
     }
+}
+
+impl<'a, I2CT, XSHUT, DELAY> VL53L3CX<'a, Enabled, I2CT, XSHUT, DELAY>
+where
+    I2CT: Read + Write + 'a,
+    XSHUT: OutputPin<Error = Infallible>,
+    DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
+{
     pub fn read_byte(&mut self, i2c: &mut I2CT, index: u16) -> Result<u8, Vl53lxError> {
         self.with_i2c(i2c, |pdev| {
             let mut data: u8 = 0;
             result!(bindings::VL53LX_RdByte(pdev, index, &mut data))?;
             Ok(data)
-        })
-    }
-    pub fn get_version(&mut self, i2c: &mut I2CT) -> Result<VL53LX_Version_t, Vl53lxError> {
-        self.with_i2c(i2c, |_| {
-            let mut version = VL53LX_Version_t::default();
-            result!(bindings::VL53LX_GetVersion(&mut version))?;
-            Ok(version)
         })
     }
     pub fn get_product_revision(&mut self, i2c: &mut I2CT) -> Result<(u8, u8), Vl53lxError> {
@@ -112,6 +121,20 @@ where
             result!(bindings::VL53LX_WaitDeviceBooted(pdev))
         })
     }
+}
+impl<'a, STATE, I2CT, XSHUT, DELAY> VL53L3CX<'a, STATE, I2CT, XSHUT, DELAY>
+where
+    I2CT: Read + Write + 'a,
+    XSHUT: OutputPin<Error = Infallible>,
+    DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
+{
+    pub fn get_version(&mut self, i2c: &mut I2CT) -> Result<VL53LX_Version_t, Vl53lxError> {
+        self.with_i2c(i2c, |_| {
+            let mut version = VL53LX_Version_t::default();
+            result!(bindings::VL53LX_GetVersion(&mut version))?;
+            Ok(version)
+        })
+    }
     pub fn set_distance_mode(
         &mut self,
         i2c: &mut I2CT,
@@ -128,6 +151,7 @@ where
             Ok(mode.into())
         })
     }
+
     pub fn set_measurement_timing_budget_ms(
         &mut self,
         i2c: &mut I2CT,
