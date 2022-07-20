@@ -3,26 +3,40 @@ use crate::VL53LX_Dev_t;
 use core::slice;
 use rtt_target::{rprint, rprintln};
 
-const DEBUG: bool = false;
+const DEBUG: bool = true;
 
 #[no_mangle]
 pub extern "C" fn VL53LX_WriteMulti(
     pdev: &mut VL53LX_Dev_t,
     index: u16,
-    pdata: *mut u8,
+    pdata: *const u8,
     count: u32,
 ) -> VL53LX_Error {
     let data = unsafe { slice::from_raw_parts(pdata, count as usize) };
     if DEBUG {
-        rprint!("VL53LX_WriteMulti: 0x{:04X} <= ", index);
+        rprint!("VL53LX_Write: [0x{:04X}] <= ", index);
         for b in data {
             rprint!("0x{:02X} ", b);
         }
         rprintln!();
     }
-    unsafe { pdev.hardware_p.as_mut() }
+    let mut buffer = [0u8; 256];
+    buffer[0] = (index >> 8) as u8;
+    buffer[1] = index as u8;
+    let mut i = 2;
+    for byte in data {
+        buffer[i] = *byte;
+        i += 1;
+    }
+    let buffer_slice =
+        unsafe { slice::from_raw_parts(&buffer as *const u8, (data.len() + 2) as usize) };
+    match unsafe { pdev.i2c_p.as_mut() }
         .unwrap()
-        .write(index, data)
+        .write(pdev.i2c_address / 2, buffer_slice)
+    {
+        Err(_) => -13,
+        Ok(_) => 0,
+    }
 }
 
 #[no_mangle]
@@ -33,12 +47,24 @@ pub extern "C" fn VL53LX_ReadMulti(
     count: u32,
 ) -> VL53LX_Error {
     if DEBUG {
-        rprint!("VL53LX_ReadMulti: 0x{:04X} => ", index);
+        rprint!("VL53LX_Read: [0x{:04X}] => ", index);
     }
     let data = unsafe { slice::from_raw_parts_mut(pdata, count as usize) };
-    let s = unsafe { pdev.hardware_p.as_mut() }
+    let buffer = [(index >> 8) as u8, index as u8];
+    if unsafe { pdev.i2c_p.as_mut() }
         .unwrap()
-        .read(index, data);
+        .write(pdev.i2c_address / 2, &buffer)
+        .is_err()
+    {
+        return -13;
+    }
+    let s = match unsafe { pdev.i2c_p.as_mut() }
+        .unwrap()
+        .read(pdev.i2c_address / 2, data)
+    {
+        Err(_) => -13,
+        Ok(_) => 0,
+    };
     if DEBUG {
         for b in data {
             rprint!("0x{:02X} ", b);
@@ -50,35 +76,17 @@ pub extern "C" fn VL53LX_ReadMulti(
 
 #[no_mangle]
 pub extern "C" fn VL53LX_WrByte(pdev: &mut VL53LX_Dev_t, index: u16, data: u8) -> VL53LX_Error {
-    if DEBUG {
-        rprintln!("VL53LX_WrByte: 0x{:04X} <= 0x{:02X}", index, data);
-    }
-    let data = unsafe { slice::from_raw_parts(&data as *const u8, 1) };
-    unsafe { pdev.hardware_p.as_mut() }
-        .unwrap()
-        .write(index, data)
+    VL53LX_WriteMulti(pdev, index, &data, 1)
 }
 
 #[no_mangle]
 pub extern "C" fn VL53LX_WrWord(pdev: &mut VL53LX_Dev_t, index: u16, data: u16) -> VL53LX_Error {
-    if DEBUG {
-        rprintln!("VL53LX_WrWord: 0x{:04X} <= 0x{:04X}", index, data);
-    }
-    let data = unsafe { slice::from_raw_parts(&data as *const u16 as *const u8, 2) };
-    unsafe { pdev.hardware_p.as_mut() }
-        .unwrap()
-        .write(index, data)
+    VL53LX_WriteMulti(pdev, index, &data as *const u16 as *const u8, 2)
 }
 
 #[no_mangle]
 pub extern "C" fn VL53LX_WrDWord(pdev: &mut VL53LX_Dev_t, index: u16, data: u32) -> VL53LX_Error {
-    if DEBUG {
-        rprintln!("VL53LX_WrDWord: 0x{:04X} <= 0x{:08X}", index, data);
-    }
-    let data = unsafe { slice::from_raw_parts(&data as *const u32 as *const u8, 4) };
-    unsafe { pdev.hardware_p.as_mut() }
-        .unwrap()
-        .write(index, data)
+    VL53LX_WriteMulti(pdev, index, &data as *const u32 as *const u8, 4)
 }
 
 #[no_mangle]
@@ -87,13 +95,7 @@ pub extern "C" fn VL53LX_RdByte(
     index: u16,
     pdata: *mut u8,
 ) -> VL53LX_Error {
-    if DEBUG {
-        rprintln!("VL53LX_RdByte: 0x{:04X}", index);
-    }
-    let data = unsafe { slice::from_raw_parts_mut(pdata, 1) };
-    unsafe { pdev.hardware_p.as_mut() }
-        .unwrap()
-        .read(index, data)
+    VL53LX_ReadMulti(pdev, index, pdata, 1)
 }
 
 #[no_mangle]
@@ -102,13 +104,7 @@ pub extern "C" fn VL53LX_RdWord(
     index: u16,
     pdata: *mut u16,
 ) -> VL53LX_Error {
-    if DEBUG {
-        rprintln!("VL53LX_RdWord: 0x{:04X}", index);
-    }
-    let data = unsafe { slice::from_raw_parts_mut(pdata as *mut u8, 2) };
-    unsafe { pdev.hardware_p.as_mut() }
-        .unwrap()
-        .read(index, data)
+    VL53LX_ReadMulti(pdev, index, pdata as *mut u8, 2)
 }
 
 #[no_mangle]
@@ -117,31 +113,23 @@ pub extern "C" fn VL53LX_RdDWord(
     index: u16,
     pdata: *mut u32,
 ) -> VL53LX_Error {
-    if DEBUG {
-        rprintln!("VL53LX_RdDWord: 0x{:04X}", index);
-    }
-    let data = unsafe { slice::from_raw_parts_mut(pdata as *mut u8, 4) };
-    unsafe { pdev.hardware_p.as_mut() }
-        .unwrap()
-        .read(index, data)
+    VL53LX_ReadMulti(pdev, index, pdata as *mut u8, 4)
 }
 
 #[no_mangle]
-pub extern "C" fn VL53LX_WaitUs(pdev: &mut VL53LX_Dev_t, count: u32) -> VL53LX_Error {
+pub extern "C" fn VL53LX_WaitUs(pdev: &mut VL53LX_Dev_t, us: u32) -> VL53LX_Error {
     if DEBUG {
-        rprintln!("VL53LX_WaitUs: {}us", count);
+        rprintln!("VL53LX_WaitUs: {}us", us);
     }
-    unsafe { pdev.hardware_p.as_mut() }.unwrap().wait_us(count)
+    unsafe { pdev.delay_p.as_mut() }
+        .expect("delay must be loaded")
+        .delay_us(us);
+    0
 }
 
 #[no_mangle]
-pub extern "C" fn VL53LX_WaitMs(pdev: &mut VL53LX_Dev_t, count: u32) -> VL53LX_Error {
-    if DEBUG {
-        rprintln!("VL53LX_WaitMs: {}ms", count);
-    }
-    unsafe { pdev.hardware_p.as_mut() }
-        .unwrap()
-        .wait_us(count * 1000)
+pub extern "C" fn VL53LX_WaitMs(pdev: &mut VL53LX_Dev_t, ms: u32) -> VL53LX_Error {
+    VL53LX_WaitUs(pdev, ms * 1000)
 }
 
 #[no_mangle]

@@ -40,10 +40,13 @@
 
 /// <div rustbindgen hide></div>
 typedef struct VL53LX_Dev_t {
-	void* hardware_p;
 	VL53LX_DevData_t   Data;
+    uint8_t i2c_address;
+    void* i2c_p;
+    void* delay_p;
 } VL53LX_Dev_t;
 
+/// <div rustbindgen hide></div>
 typedef VL53LX_Dev_t* VL53LX_DEV;
 
 /**

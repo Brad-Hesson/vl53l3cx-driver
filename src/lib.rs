@@ -3,19 +3,14 @@
 
 mod bindings;
 mod defaults;
-mod hardware;
 mod wrapper;
 
 pub use crate::bindings::{
     VL53LX_AdditionalData_t, VL53LX_DeviceInfo_t, VL53LX_MultiRangingData_t,
     VL53LX_TargetRangeData_t, VL53LX_Version_t,
 };
-use crate::{
-    bindings::VL53LX_Error,
-    hardware::{Hardware, NullHardware},
-    wrapper::vl53lx_platform_user_data::VL53LX_Dev_t,
-};
-use ::core::{convert::Infallible, ptr};
+use crate::{bindings::VL53LX_Error, wrapper::vl53lx_platform_user_data::VL53LX_Dev_t};
+use ::core::convert::Infallible;
 use ::embedded_hal::{
     blocking::{
         delay::DelayUs,
@@ -23,98 +18,111 @@ use ::embedded_hal::{
     },
     digital::v2::OutputPin,
 };
+use core::{marker::PhantomData, ptr};
 
-pub struct VL53L3CX<I2C, XSHUT, DELAY>
+pub struct VL53L3CX<'a, XSHUT, I2CT, DELAY>
 where
-    I2C: Write + Read,
     XSHUT: OutputPin<Error = Infallible>,
-    DELAY: DelayUs<u32>,
 {
-    dev_t: VL53LX_Dev_t,
-    hardware: Hardware<I2C, XSHUT, DELAY>,
+    xshut_pin: XSHUT,
+    dev_t: VL53LX_Dev_t<'a>,
+    i2ct: PhantomData<I2CT>,
+    delay: PhantomData<DELAY>,
 }
-impl<'a, I2C, XSHUT, DELAY> VL53L3CX<I2C, XSHUT, DELAY>
+impl<'a, XSHUT, I2CT, DELAY> VL53L3CX<'a, XSHUT, I2CT, DELAY>
 where
-    I2C: Write + Read + 'static,
-    XSHUT: OutputPin<Error = Infallible> + 'static,
-    DELAY: DelayUs<u32> + 'static,
+    XSHUT: OutputPin<Error = Infallible>,
+    I2CT: Read + Write + 'a,
+    DELAY: DelayUs<u32> + 'a,
 {
-    pub fn new(i2c: I2C, i2c_address: u8, xshut_pin: XSHUT) -> Self {
+    pub fn new(i2c_address: u8, xshut_pin: XSHUT) -> Self {
         Self {
-            hardware: Hardware {
-                i2c_address,
-                i2c,
-                xshut_pin,
-                delay_p: ptr::null_mut(),
-            },
             dev_t: VL53LX_Dev_t {
-                hardware_p: &mut NullHardware,
                 Data: Default::default(),
+                i2c_p: ptr::null_mut::<I2CT>(),
+                delay_p: ptr::null_mut::<DELAY>(),
+                i2c_address,
             },
+            xshut_pin,
+            i2ct: PhantomData,
+            delay: PhantomData,
         }
     }
     pub fn enable(&mut self) {
-        self.hardware
-            .xshut_pin
+        self.xshut_pin
             .set_high()
             .expect("setting pin state is infallible");
     }
-    pub fn read_byte(&mut self, index: u16) -> Result<u8, Error> {
+    pub fn read_byte(&mut self, i2c: &mut I2CT, index: u16) -> Result<u8, Error> {
         let mut data: u8 = 0;
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_RdByte(pdev, index, &mut data) })?;
+        self.with_i2c(i2c, |pdev| unsafe {
+            bindings::VL53LX_RdByte(pdev, index, &mut data)
+        })?;
         Ok(data)
     }
-    pub fn get_version(&mut self) -> Result<VL53LX_Version_t, Error> {
+    pub fn get_version(&mut self, i2c: &mut I2CT) -> Result<VL53LX_Version_t, Error> {
         let mut version = VL53LX_Version_t::default();
-        self.with_pdev(|_| unsafe { bindings::VL53LX_GetVersion(&mut version) })?;
+        self.with_i2c(i2c, |_| unsafe {
+            bindings::VL53LX_GetVersion(&mut version)
+        })?;
         Ok(version)
     }
-    pub fn get_product_revision(&mut self) -> Result<(u8, u8), Error> {
+    pub fn get_product_revision(&mut self, i2c: &mut I2CT) -> Result<(u8, u8), Error> {
         let mut major = 0u8;
         let mut minor = 0u8;
-        self.with_pdev(|pdev| unsafe {
+        self.with_i2c(i2c, |pdev| unsafe {
             bindings::VL53LX_GetProductRevision(pdev, &mut major, &mut minor)
         })?;
         Ok((major, minor))
     }
-    pub fn get_device_info(&mut self) -> Result<VL53LX_DeviceInfo_t, Error> {
+    pub fn get_device_info(&mut self, i2c: &mut I2CT) -> Result<VL53LX_DeviceInfo_t, Error> {
         let mut dev_info = VL53LX_DeviceInfo_t::default();
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_GetDeviceInfo(pdev, &mut dev_info) })?;
+        self.with_i2c(i2c, |pdev| unsafe {
+            bindings::VL53LX_GetDeviceInfo(pdev, &mut dev_info)
+        })?;
         Ok(dev_info)
     }
-    pub fn get_uid(&mut self, delay: &mut DELAY) -> Result<u64, Error> {
+    pub fn get_uid(&mut self, i2c: &mut I2CT, delay: &mut DELAY) -> Result<u64, Error> {
         let mut id = 0u64;
-        self.with_delay(delay, |pdev| unsafe {
+        self.with_delay(i2c, delay, |pdev| unsafe {
             bindings::VL53LX_GetUID(pdev, &mut id)
         })?;
         Ok(id)
     }
-    pub fn set_device_address(&mut self, address: u8) -> Result<(), Error> {
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_SetDeviceAddress(pdev, address) })?;
+    pub fn set_device_address(&mut self, i2c: &mut I2CT, address: u8) -> Result<(), Error> {
+        self.with_i2c(i2c, |pdev| unsafe {
+            bindings::VL53LX_SetDeviceAddress(pdev, address)
+        })?;
         Ok(())
     }
-    pub fn data_init(&mut self, delay: &mut DELAY) -> Result<(), Error> {
-        self.with_delay(delay, |pdev| unsafe { bindings::VL53LX_DataInit(pdev) })?;
+    pub fn data_init(&mut self, i2c: &mut I2CT, delay: &mut DELAY) -> Result<(), Error> {
+        self.with_delay(i2c, delay, |pdev| unsafe {
+            bindings::VL53LX_DataInit(pdev)
+        })?;
         Ok(())
     }
-    pub fn wait_device_booted(&mut self, delay: &mut DELAY) -> Result<(), Error> {
-        self.with_delay(delay, |pdev| unsafe {
+    pub fn wait_device_booted(&mut self, i2c: &mut I2CT, delay: &mut DELAY) -> Result<(), Error> {
+        self.with_delay(i2c, delay, |pdev| unsafe {
             bindings::VL53LX_WaitDeviceBooted(pdev)
         })?;
         Ok(())
     }
-    pub fn set_distance_mode(&mut self, mode: DistanceMode) -> Result<(), Error> {
+    pub fn set_distance_mode(&mut self, i2c: &mut I2CT, mode: DistanceMode) -> Result<(), Error> {
         let mode_num = match mode {
             DistanceMode::Short => 1,
             DistanceMode::Medium => 2,
             DistanceMode::Long => 3,
         };
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_SetDistanceMode(pdev, mode_num) })?;
+        self.with_i2c(i2c, |pdev| unsafe {
+            bindings::VL53LX_SetDistanceMode(pdev, mode_num)
+        })?;
         Ok(())
     }
-    pub fn get_distance_mode(&mut self) -> Result<DistanceMode, Error> {
+    pub fn get_distance_mode(&mut self, i2c: &mut I2CT) -> Result<DistanceMode, Error> {
         let mut mode = 0u8;
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_GetDistanceMode(pdev, &mut mode) })?;
+        self.with_i2c(i2c, |pdev| unsafe {
+            bindings::VL53LX_GetDistanceMode(pdev, &mut mode)
+        })?;
         Ok(match mode {
             1 => DistanceMode::Short,
             2 => DistanceMode::Medium,
@@ -122,76 +130,97 @@ where
             _ => unimplemented!(),
         })
     }
-    pub fn set_measurement_timing_budget_ms(&mut self, ms: u32) -> Result<(), Error> {
-        self.with_pdev(|pdev| unsafe {
+    pub fn set_measurement_timing_budget_ms(
+        &mut self,
+        i2c: &mut I2CT,
+        ms: u32,
+    ) -> Result<(), Error> {
+        self.with_i2c(i2c, |pdev| unsafe {
             bindings::VL53LX_SetMeasurementTimingBudgetMicroSeconds(pdev, ms * 1000)
         })?;
         Ok(())
     }
-    pub fn get_measurement_timing_budget_ms(&mut self) -> Result<u32, Error> {
+    pub fn get_measurement_timing_budget_ms(&mut self, i2c: &mut I2CT) -> Result<u32, Error> {
         let mut ms = 0u32;
-        self.with_pdev(|pdev| unsafe {
+        self.with_i2c(i2c, |pdev| unsafe {
             bindings::VL53LX_GetMeasurementTimingBudgetMicroSeconds(pdev, &mut ms)
         })?;
         Ok(ms / 1000)
     }
-    pub fn start_measurement(&mut self) -> Result<(), Error> {
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_StartMeasurement(pdev) })?;
+    pub fn start_measurement(&mut self, i2c: &mut I2CT) -> Result<(), Error> {
+        self.with_i2c(i2c, |pdev| unsafe {
+            bindings::VL53LX_StartMeasurement(pdev)
+        })?;
         Ok(())
     }
-    pub fn stop_measurement(&mut self) -> Result<(), Error> {
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_StopMeasurement(pdev) })?;
+    pub fn stop_measurement(&mut self, i2c: &mut I2CT) -> Result<(), Error> {
+        self.with_i2c(i2c, |pdev| unsafe {
+            bindings::VL53LX_StopMeasurement(pdev)
+        })?;
         Ok(())
     }
-    pub fn clear_interrupt_and_start_measurement(&mut self) -> Result<(), Error> {
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_ClearInterruptAndStartMeasurement(pdev) })?;
+    pub fn clear_interrupt_and_start_measurement(&mut self, i2c: &mut I2CT) -> Result<(), Error> {
+        self.with_i2c(i2c, |pdev| unsafe {
+            bindings::VL53LX_ClearInterruptAndStartMeasurement(pdev)
+        })?;
         Ok(())
     }
-    pub fn get_measurement_data_ready(&mut self) -> Result<bool, Error> {
+    pub fn get_measurement_data_ready(&mut self, i2c: &mut I2CT) -> Result<bool, Error> {
         let mut data = 0u8;
-        self.with_pdev(|pdev| unsafe {
+        self.with_i2c(i2c, |pdev| unsafe {
             bindings::VL53LX_GetMeasurementDataReady(pdev, &mut data)
         })?;
         Ok(data == 1)
     }
-    pub fn wait_measurement_data_ready<'f: 'a>(
-        &'f mut self,
-        delay: &'f mut DELAY,
+    pub fn wait_measurement_data_ready(
+        &mut self,
+        i2c: &mut I2CT,
+        delay: &mut DELAY,
     ) -> Result<(), Error> {
-        self.with_delay(delay, |pdev| unsafe {
+        self.with_delay(i2c, delay, |pdev| unsafe {
             bindings::VL53LX_WaitMeasurementDataReady(pdev)
         })?;
         Ok(())
     }
-    pub fn get_multiranging_data(&mut self) -> Result<VL53LX_MultiRangingData_t, Error> {
+    pub fn get_multiranging_data(
+        &mut self,
+        i2c: &mut I2CT,
+    ) -> Result<VL53LX_MultiRangingData_t, Error> {
         let mut data = VL53LX_MultiRangingData_t::default();
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_GetMultiRangingData(pdev, &mut data) })?;
+        self.with_i2c(i2c, |pdev| unsafe {
+            bindings::VL53LX_GetMultiRangingData(pdev, &mut data)
+        })?;
         Ok(data)
     }
-    pub fn get_additional_data(&mut self) -> Result<VL53LX_AdditionalData_t, Error> {
+    pub fn get_additional_data(
+        &mut self,
+        i2c: &mut I2CT,
+    ) -> Result<VL53LX_AdditionalData_t, Error> {
         let mut data = VL53LX_AdditionalData_t::default();
-        self.with_pdev(|pdev| unsafe { bindings::VL53LX_GetAdditionalData(pdev, &mut data) })?;
+        self.with_i2c(i2c, |pdev| unsafe {
+            bindings::VL53LX_GetAdditionalData(pdev, &mut data)
+        })?;
         Ok(data)
     }
-    fn with_pdev<F>(&mut self, mut f: F) -> Result<(), Error>
+    fn with_i2c<F>(&mut self, i2c: &mut I2CT, mut f: F) -> Result<(), Error>
     where
         F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
     {
-        self.dev_t.hardware_p = ptr::addr_of_mut!(self.hardware);
+        self.dev_t.i2c_p = i2c;
         let res = match f(&mut self.dev_t) {
             0 => Ok(()),
             status => Err(Error::from(status)),
         };
-        self.dev_t.hardware_p = &mut NullHardware;
+        self.dev_t.i2c_p = ptr::null_mut::<I2CT>();
         res
     }
-    fn with_delay<F>(&mut self, delay: &mut DELAY, f: F) -> Result<(), Error>
+    fn with_delay<F>(&mut self, i2c: &mut I2CT, delay: &mut DELAY, f: F) -> Result<(), Error>
     where
         F: FnMut(&mut VL53LX_Dev_t) -> VL53LX_Error,
     {
-        self.hardware.delay_p = delay;
-        let result = self.with_pdev(f);
-        self.hardware.delay_p = ptr::null_mut();
+        self.dev_t.delay_p = delay;
+        let result = self.with_i2c(i2c, f);
+        self.dev_t.delay_p = ptr::null_mut::<DELAY>();
         result
     }
 }
