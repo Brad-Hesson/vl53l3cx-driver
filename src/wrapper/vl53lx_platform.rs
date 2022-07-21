@@ -115,7 +115,12 @@ pub extern "C" fn VL53LX_WaitUs(pdev: &mut VL53LX_Dev_t, us: u32) -> VL53LX_Erro
 
 #[no_mangle]
 pub extern "C" fn VL53LX_WaitMs(pdev: &mut VL53LX_Dev_t, ms: u32) -> VL53LX_Error {
-    VL53LX_WaitUs(pdev, ms * 1000)
+    if DEBUG {
+        rprintln!("VL53LX_WaitMs: {}Ms", ms);
+    }
+    let delay = unsafe { pdev.delay_p.as_mut() }.expect("tried to use a null delay pointer");
+    delay.delay_ms(ms);
+    0
 }
 
 #[no_mangle]

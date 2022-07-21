@@ -13,7 +13,7 @@ use crate::{bindings::VL53LX_Error, wrapper::vl53lx_platform_user_data::VL53LX_D
 use ::core::convert::Infallible;
 use ::embedded_hal::{
     blocking::{
-        delay::DelayUs,
+        delay::{DelayMs, DelayUs},
         i2c::{Read, Write},
     },
     digital::v2::OutputPin,
@@ -33,7 +33,7 @@ impl<'a, XSHUT, I2CT, DELAY> VL53L3CX<'a, XSHUT, I2CT, DELAY>
 where
     XSHUT: OutputPin<Error = Infallible>,
     I2CT: Read + Write + 'a,
-    DELAY: DelayUs<u32> + 'a,
+    DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
 {
     pub fn new(i2c_address: u8, xshut_pin: XSHUT) -> Self {
         Self {

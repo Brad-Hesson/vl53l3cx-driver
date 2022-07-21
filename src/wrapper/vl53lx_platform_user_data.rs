@@ -1,6 +1,6 @@
 use crate::bindings::VL53LX_DevData_t;
 use ::embedded_hal::blocking::{
-    delay::DelayUs,
+    delay::{DelayMs, DelayUs},
     i2c::{Read, Write},
 };
 
@@ -16,9 +16,8 @@ pub struct VL53LX_Dev_t<'a> {
 
 #[allow(non_camel_case_types)]
 pub type VL53LX_DEV<'a> = *mut VL53LX_Dev_t<'a>;
-
-pub trait Delay: DelayUs<u32> {}
-impl<T> Delay for T where T: DelayUs<u32> {}
+pub trait Delay: DelayUs<u32> + DelayMs<u32> {}
+impl<T> Delay for T where T: DelayUs<u32> + DelayMs<u32> {}
 
 pub trait I2C {
     fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), ()>;
