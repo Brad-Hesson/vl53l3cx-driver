@@ -13,6 +13,7 @@ pub extern "C" fn VL53LX_WriteMulti(
     count: u32,
 ) -> VL53LX_Error {
     let data = unsafe { slice::from_raw_parts(pdata, count as usize) };
+    let i2c = unsafe { pdev.i2c_p.as_mut() }.expect("tried to write to a null i2c pointer");
     if DEBUG {
         rprint!("VL53LX_Write: [0x{:04X}] <= ", index);
         for b in data {
@@ -20,20 +21,12 @@ pub extern "C" fn VL53LX_WriteMulti(
         }
         rprintln!();
     }
-    let mut buffer = [0u8; 256];
+    let mut alloc = [0u8; 256];
+    let buffer = &mut alloc[..data.len() + 2];
     buffer[0] = (index >> 8) as u8;
     buffer[1] = index as u8;
-    let mut i = 2;
-    for byte in data {
-        buffer[i] = *byte;
-        i += 1;
-    }
-    let buffer_slice =
-        unsafe { slice::from_raw_parts(&buffer as *const u8, (data.len() + 2) as usize) };
-    match unsafe { pdev.i2c_p.as_mut() }
-        .unwrap()
-        .write(pdev.i2c_address / 2, buffer_slice)
-    {
+    buffer[2..].copy_from_slice(data);
+    match i2c.write(pdev.i2c_address / 2, buffer) {
         Err(_) => -13,
         Ok(_) => 0,
     }
@@ -49,19 +42,13 @@ pub extern "C" fn VL53LX_ReadMulti(
     if DEBUG {
         rprint!("VL53LX_Read: [0x{:04X}] => ", index);
     }
+    let i2c = unsafe { pdev.i2c_p.as_mut() }.expect("tried to read from a null i2c pointer");
     let data = unsafe { slice::from_raw_parts_mut(pdata, count as usize) };
     let buffer = [(index >> 8) as u8, index as u8];
-    if unsafe { pdev.i2c_p.as_mut() }
-        .unwrap()
-        .write(pdev.i2c_address / 2, &buffer)
-        .is_err()
-    {
+    if i2c.write(pdev.i2c_address / 2, &buffer).is_err() {
         return -13;
     }
-    let s = match unsafe { pdev.i2c_p.as_mut() }
-        .unwrap()
-        .read(pdev.i2c_address / 2, data)
-    {
+    let s = match i2c.read(pdev.i2c_address / 2, data) {
         Err(_) => -13,
         Ok(_) => 0,
     };
@@ -121,9 +108,8 @@ pub extern "C" fn VL53LX_WaitUs(pdev: &mut VL53LX_Dev_t, us: u32) -> VL53LX_Erro
     if DEBUG {
         rprintln!("VL53LX_WaitUs: {}us", us);
     }
-    unsafe { pdev.delay_p.as_mut() }
-        .expect("delay must be loaded")
-        .delay_us(us);
+    let delay = unsafe { pdev.delay_p.as_mut() }.expect("tried to use a null delay pointer");
+    delay.delay_us(us);
     0
 }
 
