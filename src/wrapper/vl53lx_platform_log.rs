@@ -3,8 +3,10 @@ use rtt_target::rprint;
 
 const DEBUG: bool = false;
 
+// TODO: remove unsafe fn markers where possible
+
 #[no_mangle]
-pub unsafe extern "C" fn VL53LX_clock() -> u32 {
+pub extern "C" fn VL53LX_clock() -> u32 {
     0
 }
 
