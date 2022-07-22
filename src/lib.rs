@@ -291,13 +291,17 @@ pub enum Vl53lxError {
     PlatformSpecificStart = -60,
 }
 
-#[test]
-fn ok_into_0i8() {
-    assert_eq!(Ok(()) as Result<(), Vl53lxError>, unsafe {
-        ::core::mem::transmute(0i8)
-    });
-}
-#[test]
-fn size_of_result() {
-    assert_eq!(::core::mem::size_of::<Result<(), Vl53lxError>>(), 1);
+#[cfg(test)]
+mod Vl53lxErrorTest {
+    use super::*;
+    #[test]
+    fn ok_into_0i8() {
+        assert_eq!(Ok(()) as Result<(), Vl53lxError>, unsafe {
+            ::core::mem::transmute(0i8)
+        });
+    }
+    #[test]
+    fn size_of_result() {
+        assert_eq!(::core::mem::size_of::<Result<(), Vl53lxError>>(), 1);
+    }
 }
