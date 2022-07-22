@@ -5,7 +5,6 @@ use rtt_target::{rprint, rprintln};
 
 const DEBUG: bool = true;
 
-
 #[no_mangle]
 pub extern "C" fn VL53LX_WriteMulti(
     pdev: &mut VL53LX_Dev_t,
