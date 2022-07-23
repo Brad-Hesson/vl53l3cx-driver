@@ -36,6 +36,7 @@ macro_rules! result {
 }
 pub struct Enabled;
 pub struct Disabled;
+
 impl<'a, I2CT, XSHUT, DELAY> VL53L3CX<'a, Disabled, I2CT, XSHUT, DELAY>
 where
     I2CT: Read + Write + 'a,
@@ -69,7 +70,7 @@ where
 
 impl<'a, I2CT, XSHUT, DELAY> VL53L3CX<'a, Enabled, I2CT, XSHUT, DELAY>
 where
-    I2CT: Read + Write + 'a,
+    I2CT: Write + Read + 'a,
     XSHUT: OutputPin<Error = Infallible>,
     DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
 {
