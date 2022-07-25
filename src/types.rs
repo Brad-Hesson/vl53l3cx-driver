@@ -1,29 +1,19 @@
-use ::core::mem::transmute;
-
 pub use crate::bindings::{
     VL53LX_AdditionalData_t, VL53LX_DeviceInfo_t, VL53LX_MultiRangingData_t,
     VL53LX_TargetRangeData_t, VL53LX_Version_t,
 };
+use ::num_enum::{IntoPrimitive, TryFromPrimitive};
+use ::static_assertions::{assert_eq_align, assert_eq_size};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum DistanceMode {
     Short = 1,
     Medium = 2,
     Long = 3,
 }
-impl From<u8> for DistanceMode {
-    fn from(code: u8) -> Self {
-        unsafe { transmute(code) }
-    }
-}
-impl From<DistanceMode> for u8 {
-    fn from(mode: DistanceMode) -> Self {
-        unsafe { transmute(mode) }
-    }
-}
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(i8)]
 pub enum Vl53lxError {
     CalibrationWarning = -1,
@@ -69,27 +59,10 @@ pub enum Vl53lxError {
     NotImplemented = -41,
     PlatformSpecificStart = -60,
 }
-impl From<i8> for Vl53lxError {
-    fn from(code: i8) -> Self {
-        unsafe { transmute(code) }
-    }
-}
-impl From<Vl53lxError> for i8 {
-    fn from(error: Vl53lxError) -> Self {
-        unsafe { transmute(error) }
-    }
-}
-
-#[cfg(test)]
-mod Vl53lxErrorTest {
-    use super::*;
-    use ::core::mem::size_of;
-    #[test]
-    fn ok_into_0i8() {
-        assert_eq!(Ok(()) as Result<(), Vl53lxError>, unsafe { transmute(0i8) });
-    }
-    #[test]
-    fn size_of_result() {
-        assert_eq!(size_of::<Result<(), Vl53lxError>>(), 1);
-    }
+assert_eq_size!(Result<(), Vl53lxError>, i8);
+assert_eq_align!(Result<(), Vl53lxError>, i8);
+#[test]
+fn vl53lxerror_ok_is_0i8() {
+    use ::core::mem::transmute;
+    assert_eq!(Ok(()) as Result<(), Vl53lxError>, unsafe { transmute(0i8) });
 }

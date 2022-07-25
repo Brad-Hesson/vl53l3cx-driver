@@ -43,12 +43,12 @@ pub extern "C" fn VL53LX_ReadMulti(
     let data = unsafe { slice::from_raw_parts_mut(pdata, count as usize) };
     let buffer = [(index >> 8) as u8, index as u8];
     i2c.write(pdev.i2c_address / 2, &buffer)?;
-    let s = i2c.read(pdev.i2c_address / 2, data);
+    let result = i2c.read(pdev.i2c_address / 2, data);
     if DEBUG {
         data.iter().for_each(|byte| rprint!("0x{:02X} ", byte));
         rprintln!();
     }
-    s
+    result
 }
 
 #[no_mangle]
