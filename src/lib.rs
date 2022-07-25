@@ -15,7 +15,7 @@ pub use crate::{
     },
     types::DistanceMode,
 };
-use ::core::{convert::Infallible, marker::PhantomData, ptr};
+use ::core::{convert::Infallible, fmt::Debug, marker::PhantomData, ptr};
 use ::embedded_hal::{
     blocking::{
         delay::{DelayMs, DelayUs},
@@ -31,7 +31,16 @@ pub struct VL53L3CX<'a, STATE, I2C, XSHUT, DELAY> {
     _delay: PhantomData<DELAY>,
     _state: STATE,
 }
+impl<'a, STATE: Debug, I2C, XSHUT, DELAY> Debug for VL53L3CX<'a, STATE, I2C, XSHUT, DELAY> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("VL53L3CX")
+            .field("state", &self._state)
+            .finish()
+    }
+}
+#[derive(Debug)]
 pub struct Enabled;
+#[derive(Debug)]
 pub struct Disabled;
 // -------------------------- Disabled ----------------------------
 impl<'a, I2C, XSHUT, DELAY> VL53L3CX<'a, Disabled, I2C, XSHUT, DELAY>
@@ -96,13 +105,6 @@ where
             ..self
         }
     }
-    pub fn read_byte(&mut self, i2c: &mut I2C, index: u16) -> Result<u8, Vl53lxError> {
-        self.with_i2c(i2c, |pdev| {
-            let mut data: u8 = 0;
-            result(unsafe { VL53LX_RdByte(pdev, index, &mut data) })?;
-            Ok(data)
-        })
-    }
     pub fn get_product_revision(&mut self, i2c: &mut I2C) -> Result<(u8, u8), Vl53lxError> {
         self.with_i2c(i2c, |pdev| {
             let mut major = 0u8;
@@ -130,23 +132,6 @@ where
             result(unsafe { VL53LX_SetDeviceAddress(pdev, address) })
         })
     }
-}
-// TODO: Correctly arrange functions by whether they require enabled or disabled or either one
-// TODO: Write tests using a dummy i2c and delay device to verify that the required pointers and only the required pointers are being loaded
-// -------------------------- Any ----------------------------
-impl<'a, STATE, I2C, XSHUT, DELAY> VL53L3CX<'a, STATE, I2C, XSHUT, DELAY>
-where
-    I2C: Read + Write + 'a,
-    XSHUT: OutputPin<Error = Infallible>,
-    DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
-{
-    pub fn get_version(&mut self, i2c: &mut I2C) -> Result<VL53LX_Version_t, Vl53lxError> {
-        self.with_i2c(i2c, |_| {
-            let mut version = VL53LX_Version_t::default();
-            result(unsafe { VL53LX_GetVersion(&mut version) })?;
-            Ok(version)
-        })
-    }
     pub fn set_distance_mode(
         &mut self,
         i2c: &mut I2C,
@@ -163,7 +148,6 @@ where
             Ok(mode.try_into().unwrap())
         })
     }
-
     pub fn set_measurement_timing_budget_ms(
         &mut self,
         i2c: &mut I2C,
@@ -230,6 +214,15 @@ where
             Ok(data)
         })
     }
+}
+// TODO: Write tests using a dummy i2c and delay device to verify that the required pointers and only the required pointers are being loaded
+// -------------------------- Any ----------------------------
+impl<'a, STATE, I2C, XSHUT, DELAY> VL53L3CX<'a, STATE, I2C, XSHUT, DELAY>
+where
+    I2C: Read + Write + 'a,
+    XSHUT: OutputPin<Error = Infallible>,
+    DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
+{
     #[inline]
     fn with_i2c<F, T>(&mut self, i2c: &mut I2C, f: F) -> Result<T, Vl53lxError>
     where
