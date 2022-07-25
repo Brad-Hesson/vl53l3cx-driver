@@ -38,17 +38,17 @@
 
 #include "vl53lx_def.h"
 
-typedef struct wide_void {
+typedef struct wide_void_ptr {
     void* pointer;
     void* vtable;
-} wide_void;
+} wide_void_ptr;
 
 /// <div rustbindgen hide></div>
 typedef struct VL53LX_Dev_t {
 	VL53LX_DevData_t   Data;
     uint8_t i2c_address;
-    wide_void* i2c_p;
-    wide_void* delay_p;
+    wide_void_ptr i2c_pointer;
+    wide_void_ptr delay_pointer;
 } VL53LX_Dev_t;
 
 /// <div rustbindgen hide></div>
