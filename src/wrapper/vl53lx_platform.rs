@@ -147,3 +147,12 @@ pub extern "C" fn VL53LX_WaitValueMaskEx(
     }
     Err(Vl53lxError::TimeOut)
 }
+
+#[no_mangle]
+pub extern "C" fn VL53LX_GetTickCount(
+    _dev: crate::wrapper::vl53lx_platform_user_data::VL53LX_DEV,
+    ptime_ms: *mut u32,
+) -> Result<(), Vl53lxError> {
+    unsafe { *ptime_ms = 0 };
+    Ok(())
+}
