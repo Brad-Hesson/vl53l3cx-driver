@@ -1,6 +1,6 @@
-#![no_std]
-extern crate std;
-use ::std::eprintln;
+// #![no_std]
+// extern crate std;
+// use ::std::eprintln;
 use ::vl53l3cx_driver::DistanceMode;
 use sim::setup_sensor;
 
