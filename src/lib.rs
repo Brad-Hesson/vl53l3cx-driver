@@ -15,7 +15,7 @@ pub use crate::{
     },
     types::DistanceMode,
 };
-use ::core::{convert::Infallible, fmt::Debug, marker::PhantomData, ptr};
+use ::core::{fmt::Debug, marker::PhantomData, ptr};
 use ::embedded_hal::{
     blocking::{
         delay::{DelayMs, DelayUs},
@@ -42,11 +42,9 @@ impl<'a, STATE: Debug, I2C, XSHUT, DELAY> Debug for VL53L3CX<'a, STATE, I2C, XSH
 pub struct Enabled;
 #[derive(Debug)]
 pub struct Disabled;
-// -------------------------- Disabled ----------------------------
 impl<'a, I2C, XSHUT, DELAY> VL53L3CX<'a, Disabled, I2C, XSHUT, DELAY>
 where
     I2C: Read + Write + 'a,
-    XSHUT: OutputPin<Error = Infallible>,
     DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
 {
     pub fn new(i2c_address: u8, xshut_pin: XSHUT) -> Self {
@@ -67,7 +65,11 @@ where
         mut self,
         i2c: &mut I2C,
         delay: &mut DELAY,
-    ) -> Result<VL53L3CX<'a, Enabled, I2C, XSHUT, DELAY>, (Self, Vl53lxError)> {
+    ) -> Result<VL53L3CX<'a, Enabled, I2C, XSHUT, DELAY>, (Self, Vl53lxError)>
+    where
+        XSHUT: OutputPin,
+        <XSHUT as OutputPin>::Error: Debug,
+    {
         self.xshut_pin
             .set_high()
             .expect("setting pin state is infallible");
@@ -88,15 +90,16 @@ where
         }
     }
 }
-
-// -------------------------- Enabled ----------------------------
 impl<'a, I2C, XSHUT, DELAY> VL53L3CX<'a, Enabled, I2C, XSHUT, DELAY>
 where
     I2C: Write + Read + 'a,
-    XSHUT: OutputPin<Error = Infallible>,
     DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
 {
-    pub fn into_disabled(mut self) -> VL53L3CX<'a, Disabled, I2C, XSHUT, DELAY> {
+    pub fn into_disabled(mut self) -> VL53L3CX<'a, Disabled, I2C, XSHUT, DELAY>
+    where
+        XSHUT: OutputPin,
+        <XSHUT as OutputPin>::Error: Debug,
+    {
         self.xshut_pin
             .set_low()
             .expect("setting pin state is infallible");
@@ -105,20 +108,16 @@ where
             ..self
         }
     }
-    pub fn get_product_revision(&mut self, i2c: &mut I2C) -> Result<(u8, u8), Vl53lxError> {
-        self.with_i2c(i2c, |pdev| {
-            let mut major = 0u8;
-            let mut minor = 0u8;
-            result(unsafe { VL53LX_GetProductRevision(pdev, &mut major, &mut minor) })?;
-            Ok((major, minor))
-        })
+    pub fn get_product_revision(&mut self) -> Result<(u8, u8), Vl53lxError> {
+        let mut major = 0u8;
+        let mut minor = 0u8;
+        result(unsafe { VL53LX_GetProductRevision(&mut self.dev_t, &mut major, &mut minor) })?;
+        Ok((major, minor))
     }
-    pub fn get_device_info(&mut self, i2c: &mut I2C) -> Result<VL53LX_DeviceInfo_t, Vl53lxError> {
-        self.with_i2c(i2c, |pdev| {
-            let mut dev_info = VL53LX_DeviceInfo_t::default();
-            result(unsafe { VL53LX_GetDeviceInfo(pdev, &mut dev_info) })?;
-            Ok(dev_info)
-        })
+    pub fn get_device_info(&mut self) -> Result<VL53LX_DeviceInfo_t, Vl53lxError> {
+        let mut dev_info = VL53LX_DeviceInfo_t::default();
+        result(unsafe { VL53LX_GetDeviceInfo(&mut self.dev_t, &mut dev_info) })?;
+        Ok(dev_info)
     }
     pub fn get_uid(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<u64, Vl53lxError> {
         self.with_i2c_and_delay(i2c, delay, |pdev| {
@@ -132,37 +131,21 @@ where
             result(unsafe { VL53LX_SetDeviceAddress(pdev, address) })
         })
     }
-    pub fn set_distance_mode(
-        &mut self,
-        i2c: &mut I2C,
-        mode: DistanceMode,
-    ) -> Result<(), Vl53lxError> {
-        self.with_i2c(i2c, |pdev| {
-            result(unsafe { VL53LX_SetDistanceMode(pdev, mode.into()) })
-        })
+    pub fn set_distance_mode(&mut self, mode: DistanceMode) -> Result<(), Vl53lxError> {
+        result(unsafe { VL53LX_SetDistanceMode(&mut self.dev_t, mode.into()) })
     }
-    pub fn get_distance_mode(&mut self, i2c: &mut I2C) -> Result<DistanceMode, Vl53lxError> {
-        self.with_i2c(i2c, |pdev| {
-            let mut mode = 0u8;
-            result(unsafe { VL53LX_GetDistanceMode(pdev, &mut mode) })?;
-            Ok(mode.try_into().unwrap())
-        })
+    pub fn get_distance_mode(&mut self) -> Result<DistanceMode, Vl53lxError> {
+        let mut mode = 0u8;
+        result(unsafe { VL53LX_GetDistanceMode(&mut self.dev_t, &mut mode) })?;
+        Ok(mode.try_into().unwrap())
     }
-    pub fn set_measurement_timing_budget_ms(
-        &mut self,
-        i2c: &mut I2C,
-        ms: u32,
-    ) -> Result<(), Vl53lxError> {
-        self.with_i2c(i2c, |pdev| {
-            result(unsafe { VL53LX_SetMeasurementTimingBudgetMicroSeconds(pdev, ms * 1000) })
-        })
+    pub fn set_measurement_timing_budget_ms(&mut self, ms: u32) -> Result<(), Vl53lxError> {
+        result(unsafe { VL53LX_SetMeasurementTimingBudgetMicroSeconds(&mut self.dev_t, ms * 1000) })
     }
-    pub fn get_measurement_timing_budget_ms(&mut self, i2c: &mut I2C) -> Result<u32, Vl53lxError> {
-        self.with_i2c(i2c, |pdev| {
-            let mut ms = 0u32;
-            result(unsafe { VL53LX_GetMeasurementTimingBudgetMicroSeconds(pdev, &mut ms) })?;
-            Ok(ms / 1000)
-        })
+    pub fn get_measurement_timing_budget_ms(&mut self) -> Result<u32, Vl53lxError> {
+        let mut ms = 0u32;
+        result(unsafe { VL53LX_GetMeasurementTimingBudgetMicroSeconds(&mut self.dev_t, &mut ms) })?;
+        Ok(ms / 1000)
     }
     pub fn start_measurement(&mut self, i2c: &mut I2C) -> Result<(), Vl53lxError> {
         self.with_i2c(i2c, |pdev| result(unsafe { VL53LX_StartMeasurement(pdev) }))
@@ -204,23 +187,15 @@ where
             Ok(data)
         })
     }
-    pub fn get_additional_data(
-        &mut self,
-        i2c: &mut I2C,
-    ) -> Result<VL53LX_AdditionalData_t, Vl53lxError> {
-        self.with_i2c(i2c, |pdev| {
-            let mut data = VL53LX_AdditionalData_t::default();
-            result(unsafe { VL53LX_GetAdditionalData(pdev, &mut data) })?;
-            Ok(data)
-        })
+    pub fn get_additional_data(&mut self) -> Result<VL53LX_AdditionalData_t, Vl53lxError> {
+        let mut data = VL53LX_AdditionalData_t::default();
+        result(unsafe { VL53LX_GetAdditionalData(&mut self.dev_t, &mut data) })?;
+        Ok(data)
     }
 }
-// TODO: Write tests using a dummy i2c and delay device to verify that the required pointers and only the required pointers are being loaded
-// -------------------------- Any ----------------------------
 impl<'a, STATE, I2C, XSHUT, DELAY> VL53L3CX<'a, STATE, I2C, XSHUT, DELAY>
 where
     I2C: Read + Write + 'a,
-    XSHUT: OutputPin<Error = Infallible>,
     DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
 {
     #[inline]

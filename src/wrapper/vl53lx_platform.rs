@@ -17,7 +17,11 @@ pub extern "C" fn VL53LX_WriteMulti(
     let i2c = unsafe { pdev.i2c_pointer.as_mut() }.expect("tried to write to a null i2c pointer");
     let data = unsafe { slice::from_raw_parts(pdata, count as usize) };
     if DEBUG {
-        rprint!("VL53LX_Write: [0x{:04X}] <= ", index);
+        rprint!(
+            "Write: [0x{:04X}..0x{:04X}] <= ",
+            index,
+            data.len() as u16 + index - 1
+        );
         data.iter().for_each(|byte| rprint!("0x{:02X} ", byte));
         rprintln!();
     }
@@ -37,7 +41,11 @@ pub extern "C" fn VL53LX_ReadMulti(
     count: u32,
 ) -> Result<(), Vl53lxError> {
     if DEBUG {
-        rprint!("VL53LX_Read: [0x{:04X}] => ", index);
+        rprint!(
+            " Read: [0x{:04X}..0x{:04X}] => ",
+            index,
+            index + count as u16 - 1
+        );
     }
     let i2c = unsafe { pdev.i2c_pointer.as_mut() }.expect("tried to read from a null i2c pointer");
     let data = unsafe { slice::from_raw_parts_mut(pdata, count as usize) };
