@@ -114,8 +114,7 @@ mod sim {
                 memory: [0xFF; 0xFFFF],
                 used: false,
             };
-            // _self.write_memory(0x00DE, &[0xAB, 0xCD]);
-            _self.write_memory(0x0031, &[1]);
+            _self.write_memory(0x00E5, &[0]);
             _self
         }
         pub fn used(&mut self) -> bool {
