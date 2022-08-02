@@ -40,8 +40,9 @@ fn run_bindgen(file: PathBuf, search_paths: Vec<PathBuf>) {
     let mut builder = bindgen::Builder::default()
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .ctypes_prefix("cty")
-        .use_core();
-    builder = builder.header(file.to_str().unwrap());
+        .header(file.to_str().unwrap())
+        .use_core()
+        .clang_arg("--target=riscv32-esp-espidf");
     for sp in search_paths {
         builder = builder.clang_arg(format!("-I{}", sp.display()));
     }
