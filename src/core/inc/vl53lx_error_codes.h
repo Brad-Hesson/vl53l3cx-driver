@@ -24,6 +24,7 @@
 extern "C" {
 #endif
 
+
 /*
  ****************************************
  * PRIVATE define do not edit
@@ -103,7 +104,7 @@ typedef int8_t VL53LX_Error;
 	 * parameters unaltered.
 	 */
 
-	 
+
 #define VL53LX_ERROR_OFFSET_CAL_NO_SAMPLE_FAIL           ((VL53LX_Error) - 24)
 	/*!<  Thrown if there one of stages has no valid offset calibration
 	 *    samples. A fatal error calibration not valid
