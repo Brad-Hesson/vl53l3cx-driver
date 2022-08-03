@@ -2,7 +2,6 @@
 #![feature(c_variadic, type_changing_struct_update)]
 
 mod bindings;
-mod defaults;
 mod hardware;
 mod types;
 mod wrapper;
