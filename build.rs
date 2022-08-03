@@ -10,17 +10,20 @@ fn main() {
         ["src", "core", "src"].iter().collect(),
         ["src", "core", "inc"].iter().collect(),
     ];
-    run_bindgen(file.clone(), search_paths.clone());
-    compile_c_code(file, search_paths);
+    run_bindgen(&file, &search_paths);
+    compile_c_code(&file, &search_paths);
 }
 
-fn compile_c_code(file: PathBuf, search_paths: Vec<PathBuf>) {
+fn compile_c_code(file: &PathBuf, search_paths: &Vec<PathBuf>) {
     let mut build = cc::Build::new();
     build.compiler("clang");
-    for dir in search_paths.clone() {
+    for dir in search_paths {
         for file in fs::read_dir(dir).unwrap() {
             let path = file.unwrap().path();
             if path.extension().unwrap() == "c" {
+                if path.file_stem().unwrap() == "vl53lx_hist_char"{
+                    continue;
+                }
                 println!("Compiling: {}", path.display());
                 build.file(path);
             }
@@ -31,8 +34,8 @@ fn compile_c_code(file: PathBuf, search_paths: Vec<PathBuf>) {
     }
     if let Some(target) = get_riscv_target_fixed() {
         build.target(target.as_str());
+        build.flag_if_supported("-Wno-builtin-declaration-mismatch");
     }
-    build.flag_if_supported("-Wno-builtin-declaration-mismatch");
     build.flag_if_supported("-Wno-missing-declarations");
     build.flag("-Wno-#pragma-messages");
     build.flag("-Wno-implicit-function-declaration");
@@ -40,7 +43,7 @@ fn compile_c_code(file: PathBuf, search_paths: Vec<PathBuf>) {
     build.compile(file.file_stem().unwrap().to_str().unwrap());
 }
 
-fn run_bindgen(file: PathBuf, search_paths: Vec<PathBuf>) {
+fn run_bindgen(file: &PathBuf, search_paths: &Vec<PathBuf>) {
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed={}", file.display());
 
