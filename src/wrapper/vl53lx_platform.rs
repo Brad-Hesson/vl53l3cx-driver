@@ -30,7 +30,7 @@ pub extern "C" fn VL53LX_WriteMulti(
     buffer[0] = (index >> 8) as u8;
     buffer[1] = index as u8;
     buffer[2..].copy_from_slice(data);
-    i2c.write(pdev.i2c_address / 2, buffer)
+    i2c.write(pdev.i2c_address, buffer)
 }
 
 #[no_mangle]
@@ -50,8 +50,8 @@ pub extern "C" fn VL53LX_ReadMulti(
     let i2c = unsafe { pdev.i2c_pointer.as_mut() }.expect("tried to read from a null i2c pointer");
     let data = unsafe { slice::from_raw_parts_mut(pdata, count as usize) };
     let buffer = [(index >> 8) as u8, index as u8];
-    i2c.write(pdev.i2c_address / 2, &buffer)?;
-    let result = i2c.read(pdev.i2c_address / 2, data);
+    i2c.write(pdev.i2c_address, &buffer)?;
+    let result = i2c.read(pdev.i2c_address, data);
     if DEBUG {
         data.iter().for_each(|byte| rprint!("0x{:02X} ", byte));
         rprintln!();

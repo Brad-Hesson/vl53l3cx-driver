@@ -128,7 +128,9 @@ where
     pub fn set_device_address(&mut self, i2c: &mut I2C, address: u8) -> Result<(), Vl53lxError> {
         self.with_i2c(i2c, |pdev| {
             result(unsafe { VL53LX_SetDeviceAddress(pdev, address) })
-        })
+        })?;
+        self.dev_t.i2c_address = address;
+        Ok(())
     }
     pub fn set_distance_mode(&mut self, mode: DistanceMode) -> Result<(), Vl53lxError> {
         result(unsafe { VL53LX_SetDistanceMode(&mut self.dev_t, mode.into()) })
