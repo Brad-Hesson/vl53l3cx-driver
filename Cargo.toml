@@ -13,6 +13,5 @@ static_assertions = "1.1"
 num_enum = { version = "0.5", default-features = false }
 
 [build-dependencies]
-cc = {path = "cc-rs-master"}
-# cc = "1.0.37"
+cc = "1.0"
 bindgen = "0.60"
