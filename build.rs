@@ -1,20 +1,20 @@
 #![feature(iter_intersperse)]
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
-    let file: PathBuf = ["src", "core", "src", "vl53lx_api.c"].iter().collect();
-    let search_paths: Vec<PathBuf> = vec![
-        ["src", "wrapper"].iter().collect(),
-        ["src", "core", "src"].iter().collect(),
-        ["src", "core", "inc"].iter().collect(),
+    let file = Path::new("src/core/src/vl53lx_api.c");
+    let search_paths = vec![
+        Path::new("src/wrapper"),
+        Path::new("src/core/src"),
+        Path::new("src/core/inc"),
     ];
-    run_bindgen(&file, &search_paths);
-    compile_c_code(&file, &search_paths);
+    run_bindgen(file, &search_paths);
+    compile_c_code(file, &search_paths);
 }
 
-fn compile_c_code(file: &PathBuf, search_paths: &Vec<PathBuf>) {
+fn compile_c_code(file: &Path, search_paths: &Vec<&Path>) {
     let mut build = cc::Build::new();
     build.compiler("clang");
     search_paths
@@ -41,7 +41,7 @@ fn compile_c_code(file: &PathBuf, search_paths: &Vec<PathBuf>) {
     build.compile(file.file_stem().unwrap().to_str().unwrap());
 }
 
-fn run_bindgen(file: &PathBuf, search_paths: &Vec<PathBuf>) {
+fn run_bindgen(file: &Path, search_paths: &Vec<&Path>) {
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed={}", file.display());
 
@@ -67,7 +67,7 @@ fn run_bindgen(file: &PathBuf, search_paths: &Vec<PathBuf>) {
 
 fn get_riscv_target_fixed() -> Option<String> {
     let target = env::var("TARGET").expect("Target environment variable should be set");
-    let mut triple = target.split("-").collect::<Vec<_>>();
+    let mut triple = target.split('-').collect::<Vec<_>>();
     if triple[0].starts_with("riscv") {
         triple[0] = &triple[0][..7];
         return Some(triple.into_iter().intersperse("-").collect());
