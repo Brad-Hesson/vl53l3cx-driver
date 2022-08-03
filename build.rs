@@ -17,29 +17,27 @@ fn main() {
 fn compile_c_code(file: &PathBuf, search_paths: &Vec<PathBuf>) {
     let mut build = cc::Build::new();
     build.compiler("clang");
-    for dir in search_paths {
-        for file in fs::read_dir(dir).unwrap() {
-            let path = file.unwrap().path();
-            if path.extension().unwrap() == "c" {
-                if path.file_stem().unwrap() == "vl53lx_hist_char"{
-                    continue;
-                }
-                println!("Compiling: {}", path.display());
-                build.file(path);
-            }
-        }
-    }
+    search_paths
+        .iter()
+        .flat_map(|dir| fs::read_dir(dir).unwrap())
+        .map(|file| file.unwrap().path())
+        .filter(|path| path.extension().unwrap() == "c")
+        .filter(|path| path.file_stem().unwrap() != "vl53lx_hist_char")
+        .for_each(|path| {
+            println!("Compiling: {}", path.display());
+            build.file(path);
+        });
     for sp in search_paths {
         build.include(sp);
     }
+    build.flag_if_supported("-Wno-format");
+    build.flag_if_supported("-Wno-missing-declarations");
+    build.flag("-Wno-implicit-function-declaration");
     if let Some(target) = get_riscv_target_fixed() {
         build.target(target.as_str());
         build.flag_if_supported("-Wno-builtin-declaration-mismatch");
+        build.flag("-Wno-#pragma-messages");
     }
-    build.flag_if_supported("-Wno-missing-declarations");
-    build.flag("-Wno-#pragma-messages");
-    build.flag("-Wno-implicit-function-declaration");
-    build.flag_if_supported("-Wno-format");
     build.compile(file.file_stem().unwrap().to_str().unwrap());
 }
 
@@ -49,6 +47,7 @@ fn run_bindgen(file: &PathBuf, search_paths: &Vec<PathBuf>) {
 
     let mut builder = bindgen::Builder::default()
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .parse_callbacks(Box::new(ForceImplDefault))
         .ctypes_prefix("cty")
         .header(file.to_str().unwrap())
         .use_core();
@@ -74,4 +73,22 @@ fn get_riscv_target_fixed() -> Option<String> {
         return Some(triple.into_iter().intersperse("-").collect());
     }
     None
+}
+
+#[derive(Debug)]
+struct ForceImplDefault;
+impl bindgen::callbacks::ParseCallbacks for ForceImplDefault {
+    fn add_derives(&self, name: &str) -> Vec<String> {
+        if vec![
+            "wide_void_ptr",
+            "VL53LX_spad_rate_data_t",
+            "VL53LX_LLDriverData_t",
+        ]
+        .contains(&name)
+        {
+            vec![]
+        } else {
+            vec!["Default".into()]
+        }
+    }
 }
