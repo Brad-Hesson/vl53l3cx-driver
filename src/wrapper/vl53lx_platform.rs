@@ -27,7 +27,7 @@ pub extern "C" fn VL53LX_WriteMulti(
     }
     let mut alloc = [0u8; 256];
     let buffer = &mut alloc[..data.len() + 2];
-    buffer[..2] = index.to_be_bytes();
+    buffer[..2].copy_from_slice(&index.to_be_bytes());
     buffer[2..].copy_from_slice(data);
     i2c.write(pdev.i2c_address, buffer)
 }
