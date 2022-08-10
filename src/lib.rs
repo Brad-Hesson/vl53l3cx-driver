@@ -225,7 +225,7 @@ where
         result
     }
 }
-#[inline]
+#[inline(always)]
 fn result(code: i8) -> Result<(), Vl53lxError> {
     match code {
         0 => Ok(()),
