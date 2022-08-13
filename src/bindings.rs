@@ -3,8 +3,7 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 #![allow(improper_ctypes)]
-use crate::wrapper::vl53lx_platform_user_data::VL53LX_DEV;
-use crate::VL53LX_Dev_t;
+use crate::wrapper::vl53lx_platform_user_data::{VL53LX_Dev_t, VL53LX_DEV};
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 impl Default for VL53LX_LLDriverData_t {
