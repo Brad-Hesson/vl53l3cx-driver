@@ -2,6 +2,7 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::vec;
 
 fn main() {
     let file = Path::new("src/core/src/vl53lx_api.c");
@@ -47,7 +48,7 @@ fn run_bindgen(file: &Path, search_paths: &Vec<&Path>) {
 
     let mut builder = bindgen::Builder::default()
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        .parse_callbacks(Box::new(ForceImplDefault))
+        .parse_callbacks(Box::new(AddDerives))
         .ctypes_prefix("cty")
         .header(file.to_str().unwrap())
         .use_core();
@@ -76,19 +77,16 @@ fn get_riscv_target_fixed() -> Option<String> {
 }
 
 #[derive(Debug)]
-struct ForceImplDefault;
-impl bindgen::callbacks::ParseCallbacks for ForceImplDefault {
+struct AddDerives;
+impl bindgen::callbacks::ParseCallbacks for AddDerives {
     fn add_derives(&self, name: &str) -> Vec<String> {
-        if vec![
-            "wide_void_ptr",
-            "VL53LX_spad_rate_data_t",
-            "VL53LX_LLDriverData_t",
-        ]
-        .contains(&name)
-        {
-            vec![]
-        } else {
-            vec!["Default".into()]
-        }
+        let mut derives = vec![];
+        match name {
+            "wide_void_ptr" => {}
+            "VL53LX_spad_rate_data_t" => {}
+            "VL53LX_LLDriverData_t" => {}
+            _ => derives.push("Default".into()),
+        };
+        derives
     }
 }
