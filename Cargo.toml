@@ -12,6 +12,9 @@ embedded-hal = "0.2"
 static_assertions = "1.1"
 num_enum = { version = "0.5", default-features = false }
 
+[features]
+std = []
+
 [build-dependencies]
 cc = "1.0"
 bindgen = "0.60"

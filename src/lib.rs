@@ -1,11 +1,13 @@
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![feature(c_variadic, type_changing_struct_update)]
 
 mod bindings;
 mod hardware;
+mod maybe_box;
 mod types;
 mod wrapper;
 
+use crate::maybe_box::MaybeBox;
 use crate::{bindings::*, types::Vl53lxError, wrapper::vl53lx_platform_user_data::VL53LX_Dev_t};
 pub use crate::{
     bindings::{
@@ -25,7 +27,7 @@ use ::embedded_hal::{
 
 pub struct VL53L3CX<'a, STATE, I2C, XSHUT, DELAY> {
     xshut_pin: XSHUT,
-    dev_t: VL53LX_Dev_t<'a>,
+    pub dev_t: MaybeBox<VL53LX_Dev_t<'a>>,
     _i2c: PhantomData<I2C>,
     _delay: PhantomData<DELAY>,
     _state: STATE,
@@ -48,12 +50,12 @@ where
 {
     pub fn new(i2c_address: u8, xshut_pin: XSHUT) -> Self {
         Self {
-            dev_t: VL53LX_Dev_t {
-                Data: Default::default(),
+            dev_t: MaybeBox::new(VL53LX_Dev_t {
+                Data: unsafe { ::core::mem::zeroed() },
                 i2c_pointer: ptr::null_mut::<I2C>(),
                 delay_pointer: ptr::null_mut::<DELAY>(),
                 i2c_address,
-            },
+            }),
             xshut_pin,
             _i2c: PhantomData,
             _delay: PhantomData,
@@ -110,12 +112,12 @@ where
     pub fn get_product_revision(&mut self) -> Result<(u8, u8), Vl53lxError> {
         let mut major = 0u8;
         let mut minor = 0u8;
-        result(unsafe { VL53LX_GetProductRevision(&mut self.dev_t, &mut major, &mut minor) })?;
+        result(unsafe { VL53LX_GetProductRevision(self.dev_t.as_mut(), &mut major, &mut minor) })?;
         Ok((major, minor))
     }
     pub fn get_device_info(&mut self) -> Result<VL53LX_DeviceInfo_t, Vl53lxError> {
         let mut dev_info = VL53LX_DeviceInfo_t::default();
-        result(unsafe { VL53LX_GetDeviceInfo(&mut self.dev_t, &mut dev_info) })?;
+        result(unsafe { VL53LX_GetDeviceInfo(self.dev_t.as_mut(), &mut dev_info) })?;
         Ok(dev_info)
     }
     pub fn get_uid(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<u64, Vl53lxError> {
@@ -133,19 +135,23 @@ where
         Ok(())
     }
     pub fn set_distance_mode(&mut self, mode: DistanceMode) -> Result<(), Vl53lxError> {
-        result(unsafe { VL53LX_SetDistanceMode(&mut self.dev_t, mode.into()) })
+        result(unsafe { VL53LX_SetDistanceMode(self.dev_t.as_mut(), mode.into()) })
     }
     pub fn get_distance_mode(&mut self) -> Result<DistanceMode, Vl53lxError> {
         let mut mode = 0u8;
-        result(unsafe { VL53LX_GetDistanceMode(&mut self.dev_t, &mut mode) })?;
+        result(unsafe { VL53LX_GetDistanceMode(self.dev_t.as_mut(), &mut mode) })?;
         Ok(mode.try_into().unwrap())
     }
     pub fn set_measurement_timing_budget_ms(&mut self, ms: u32) -> Result<(), Vl53lxError> {
-        result(unsafe { VL53LX_SetMeasurementTimingBudgetMicroSeconds(&mut self.dev_t, ms * 1000) })
+        result(unsafe {
+            VL53LX_SetMeasurementTimingBudgetMicroSeconds(self.dev_t.as_mut(), ms * 1000)
+        })
     }
     pub fn get_measurement_timing_budget_ms(&mut self) -> Result<u32, Vl53lxError> {
         let mut ms = 0u32;
-        result(unsafe { VL53LX_GetMeasurementTimingBudgetMicroSeconds(&mut self.dev_t, &mut ms) })?;
+        result(unsafe {
+            VL53LX_GetMeasurementTimingBudgetMicroSeconds(self.dev_t.as_mut(), &mut ms)
+        })?;
         Ok(ms / 1000)
     }
     pub fn start_measurement(&mut self, i2c: &mut I2C) -> Result<(), Vl53lxError> {
@@ -190,7 +196,7 @@ where
     }
     pub fn get_additional_data(&mut self) -> Result<VL53LX_AdditionalData_t, Vl53lxError> {
         let mut data = VL53LX_AdditionalData_t::default();
-        result(unsafe { VL53LX_GetAdditionalData(&mut self.dev_t, &mut data) })?;
+        result(unsafe { VL53LX_GetAdditionalData(self.dev_t.as_mut(), &mut data) })?;
         Ok(data)
     }
 }
@@ -205,7 +211,7 @@ where
         F: FnOnce(&mut VL53LX_Dev_t) -> Result<T, Vl53lxError>,
     {
         self.dev_t.i2c_pointer = i2c;
-        let result = f(&mut self.dev_t);
+        let result = f(self.dev_t.as_mut());
         self.dev_t.i2c_pointer = ptr::null_mut::<I2C>();
         result
     }
