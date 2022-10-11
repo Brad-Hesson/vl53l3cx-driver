@@ -11,6 +11,7 @@ rtt-target = { version = "0.3", features = ["cortex-m"] }
 embedded-hal = "0.2"
 static_assertions = "1.1"
 num_enum = { version = "0.5", default-features = false }
+serde = { version = "1.0.145", features = ["serde_derive"] }
 
 [features]
 std = []

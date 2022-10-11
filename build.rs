@@ -85,8 +85,20 @@ impl bindgen::callbacks::ParseCallbacks for AddDerives {
             "wide_void_ptr" => {}
             "VL53LX_spad_rate_data_t" => {}
             "VL53LX_LLDriverData_t" => {}
-            _ => derives.push("Default".into()),
+            "threadlocaleinfostruct__bindgen_ty_1" => {}
+            "threadlocaleinfostruct" => {}
+            "localeinfo_struct" => {}
+            _ => derives.push("Default"),
         };
-        derives
+        match name {
+            "VL53LX_MultiRangingData_t" => {
+                derives.extend(["serde::Serialize", "serde::Deserialize"])
+            }
+            "VL53LX_TargetRangeData_t" => {
+                derives.extend(["serde::Serialize", "serde::Deserialize"])
+            }
+            _ => {}
+        };
+        derives.into_iter().map(|s| s.to_string()).collect()
     }
 }
