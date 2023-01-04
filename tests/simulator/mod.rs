@@ -7,16 +7,15 @@ use ::embedded_hal::{
     digital::v2::OutputPin,
 };
 use ::std::{cell::RefCell, eprint, eprintln, rc::Rc};
-use ::vl53l3cx_driver::{Enabled, VL53L3CX};
+use ::vl53l3cx_driver::VL53L3CX;
 
-pub fn setup_sensor<'a>() -> (VL53L3CX<'a, Enabled, I2c, Pin, Delay>, I2c, Delay) {
+pub fn setup_sensor<'a>() -> (VL53L3CX<'a, I2c, Pin, Delay>, I2c, Delay) {
     let device = Rc::new(RefCell::new(DeviceSim::new()));
     let mut i2c = I2c::new(device.clone());
     let pin = Pin(device);
     let mut delay = Delay::new();
-    let sensor = VL53L3CX::new(0x00, pin)
-        .into_enabled(&mut i2c, &mut delay)
-        .unwrap();
+    let mut sensor = VL53L3CX::new(0x00, pin);
+    sensor.enable(&mut i2c, &mut delay).unwrap();
     assert!(i2c.used());
     assert!(delay.used());
     eprintln!("-------- sensor setup complete --------");

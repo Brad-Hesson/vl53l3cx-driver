@@ -25,25 +25,18 @@ use ::embedded_hal::{
     digital::v2::OutputPin,
 };
 
-pub struct VL53L3CX<'a, STATE, I2C, XSHUT, DELAY> {
+pub struct VL53L3CX<'a, I2C, XSHUT, DELAY> {
     xshut_pin: XSHUT,
     pub dev_t: MaybeBox<VL53LX_Dev_t<'a>>,
     _i2c: PhantomData<I2C>,
     _delay: PhantomData<DELAY>,
-    _state: STATE,
 }
-impl<'a, STATE: Debug, I2C, XSHUT, DELAY> Debug for VL53L3CX<'a, STATE, I2C, XSHUT, DELAY> {
+impl<'a, I2C, XSHUT, DELAY> Debug for VL53L3CX<'a, I2C, XSHUT, DELAY> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("VL53L3CX")
-            .field("state", &self._state)
-            .finish()
+        f.debug_struct("VL53L3CX").finish()
     }
 }
-#[derive(Debug)]
-pub struct Enabled;
-#[derive(Debug)]
-pub struct Disabled;
-impl<'a, I2C, XSHUT, DELAY> VL53L3CX<'a, Disabled, I2C, XSHUT, DELAY>
+impl<'a, I2C, XSHUT, DELAY> VL53L3CX<'a, I2C, XSHUT, DELAY>
 where
     I2C: Read + Write + 'a,
     DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
@@ -59,14 +52,9 @@ where
             xshut_pin,
             _i2c: PhantomData,
             _delay: PhantomData,
-            _state: Disabled,
         }
     }
-    pub fn into_enabled(
-        mut self,
-        i2c: &mut I2C,
-        delay: &mut DELAY,
-    ) -> Result<VL53L3CX<'a, Enabled, I2C, XSHUT, DELAY>, (Self, Vl53lxError)>
+    pub fn enable(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), Vl53lxError>
     where
         XSHUT: OutputPin,
         <XSHUT as OutputPin>::Error: Debug,
@@ -74,29 +62,12 @@ where
         self.xshut_pin
             .set_high()
             .expect("setting pin state is infallible");
-        match self.with_i2c_and_delay(i2c, delay, |pdev| {
+        self.with_i2c_and_delay(i2c, delay, |pdev| {
             result(unsafe { VL53LX_WaitDeviceBooted(pdev) })?;
             result(unsafe { VL53LX_DataInit(pdev) })
-        }) {
-            Ok(_) => Ok(VL53L3CX {
-                _state: Enabled,
-                ..self
-            }),
-            Err(e) => {
-                self.xshut_pin
-                    .set_low()
-                    .expect("setting pin state is infallible");
-                Err((self, e))
-            }
-        }
+        })
     }
-}
-impl<'a, I2C, XSHUT, DELAY> VL53L3CX<'a, Enabled, I2C, XSHUT, DELAY>
-where
-    I2C: Write + Read + 'a,
-    DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
-{
-    pub fn into_disabled(mut self) -> VL53L3CX<'a, Disabled, I2C, XSHUT, DELAY>
+    pub fn disable(&mut self)
     where
         XSHUT: OutputPin,
         <XSHUT as OutputPin>::Error: Debug,
@@ -104,10 +75,9 @@ where
         self.xshut_pin
             .set_low()
             .expect("setting pin state is infallible");
-        VL53L3CX {
-            _state: Disabled,
-            ..self
-        }
+    }
+    pub fn release(self) -> XSHUT {
+        self.xshut_pin
     }
     pub fn get_product_revision(&mut self) -> Result<(u8, u8), Vl53lxError> {
         let mut major = 0u8;
@@ -200,7 +170,7 @@ where
         Ok(data)
     }
 }
-impl<'a, STATE, I2C, XSHUT, DELAY> VL53L3CX<'a, STATE, I2C, XSHUT, DELAY>
+impl<'a, I2C, XSHUT, DELAY> VL53L3CX<'a, I2C, XSHUT, DELAY>
 where
     I2C: Read + Write + 'a,
     DELAY: DelayUs<u32> + DelayMs<u32> + 'a,
