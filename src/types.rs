@@ -98,7 +98,7 @@ pub struct RangeData {
     pub sigma_mm: f32,
     pub signal_rate_rtn_mega_cps: f32,
     pub ambient_rate_rtn_mega_cps: f32,
-    pub range_status: u8,
+    pub range_status: RangeStatus,
     pub extended_range: bool,
 }
 impl From<VL53LX_TargetRangeData_t> for RangeData {
@@ -107,11 +107,32 @@ impl From<VL53LX_TargetRangeData_t> for RangeData {
             range_min_mm: value.RangeMinMilliMeter,
             range_mm: value.RangeMilliMeter,
             range_max_mm: value.RangeMaxMilliMeter,
-            sigma_mm: value.SigmaMilliMeter as f32 / (2u16.pow(16) as f32),
-            signal_rate_rtn_mega_cps: value.SignalRateRtnMegaCps as f32 / (2u16.pow(16) as f32),
-            ambient_rate_rtn_mega_cps: value.AmbientRateRtnMegaCps as f32 / (2u16.pow(16) as f32),
-            range_status: value.RangeStatus,
+            sigma_mm: value.SigmaMilliMeter as f32 / 65536.,
+            signal_rate_rtn_mega_cps: value.SignalRateRtnMegaCps as f32 / 65536.,
+            ambient_rate_rtn_mega_cps: value.AmbientRateRtnMegaCps as f32 / 65536.,
+            range_status: value.RangeStatus.try_into().unwrap(),
             extended_range: value.ExtendedRange == 1,
         }
     }
+}
+
+#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
+pub enum RangeStatus {
+    RangeValid = 0,
+    SigmaFail = 1,
+    SignalFail = 2,
+    RangeValidMinRangeClipped = 3,
+    OutofboundsFail = 4,
+    HardwareFail = 5,
+    RangeValidNoWrapCheckFail = 6,
+    WrapTargetFail = 7,
+    ProcessingFail = 8,
+    XtalkSignalFail = 9,
+    SyncronisationInt = 10,
+    RangeValidMergedPulse = 11,
+    TargetPresentLackOfSignal = 12,
+    MinRangeFail = 13,
+    RangeInvalid = 14,
+    None = 255,
 }
