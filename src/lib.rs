@@ -24,6 +24,7 @@ use ::embedded_hal::{
     },
     digital::v2::OutputPin,
 };
+use types::MultiRangingData;
 
 pub struct VL53L3CX<'a, I2C, XSHUT, DELAY> {
     xshut_pin: XSHUT,
@@ -157,11 +158,11 @@ where
     pub fn get_multiranging_data(
         &mut self,
         i2c: &mut I2C,
-    ) -> Result<VL53LX_MultiRangingData_t, Vl53lxError> {
+    ) -> Result<MultiRangingData, Vl53lxError> {
         self.with_i2c(i2c, |pdev| {
             let mut data = VL53LX_MultiRangingData_t::default();
             result(unsafe { VL53LX_GetMultiRangingData(pdev, &mut data) })?;
-            Ok(data)
+            Ok(data.into())
         })
     }
     pub fn get_additional_data(&mut self) -> Result<VL53LX_AdditionalData_t, Vl53lxError> {

@@ -4,6 +4,7 @@ pub use crate::bindings::{
 };
 use ::num_enum::{IntoPrimitive, TryFromPrimitive};
 use ::static_assertions::{assert_eq_align, assert_eq_size};
+use heapless::Vec;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
@@ -65,4 +66,52 @@ assert_eq_align!(Result<(), Vl53lxError>, i8);
 fn vl53lxerror_ok_is_0i8() {
     use ::core::mem::transmute;
     assert_eq!(Ok(()) as Result<(), Vl53lxError>, unsafe { transmute(0i8) });
+}
+
+#[derive(Debug)]
+pub struct MultiRangingData {
+    pub stream_count: u8,
+    pub xtalk_changed: bool,
+    pub effective_spad_rtn: f32,
+    pub range_data: Vec<RangeData, 4>,
+}
+impl From<VL53LX_MultiRangingData_t> for MultiRangingData {
+    fn from(value: VL53LX_MultiRangingData_t) -> Self {
+        let mut range_data = Vec::new();
+        for i in 0..value.NumberOfObjectsFound {
+            unsafe { range_data.push_unchecked(value.RangeData[i as usize].into()) };
+        }
+        Self {
+            stream_count: value.StreamCount,
+            xtalk_changed: value.HasXtalkValueChanged == 1,
+            effective_spad_rtn: value.EffectiveSpadRtnCount as f32 / 256.,
+            range_data,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RangeData {
+    pub range_min_mm: i16,
+    pub range_mm: i16,
+    pub range_max_mm: i16,
+    pub sigma_mm: f32,
+    pub signal_rate_rtn_mega_cps: f32,
+    pub ambient_rate_rtn_mega_cps: f32,
+    pub range_status: u8,
+    pub extended_range: bool,
+}
+impl From<VL53LX_TargetRangeData_t> for RangeData {
+    fn from(value: VL53LX_TargetRangeData_t) -> Self {
+        Self {
+            range_min_mm: value.RangeMinMilliMeter,
+            range_mm: value.RangeMilliMeter,
+            range_max_mm: value.RangeMaxMilliMeter,
+            sigma_mm: value.SigmaMilliMeter as f32 / (2u16.pow(16) as f32),
+            signal_rate_rtn_mega_cps: value.SignalRateRtnMegaCps as f32 / (2u16.pow(16) as f32),
+            ambient_rate_rtn_mega_cps: value.AmbientRateRtnMegaCps as f32 / (2u16.pow(16) as f32),
+            range_status: value.RangeStatus,
+            extended_range: value.ExtendedRange == 1,
+        }
+    }
 }
