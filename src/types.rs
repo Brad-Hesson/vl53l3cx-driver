@@ -3,6 +3,7 @@ pub use crate::bindings::{
     VL53LX_TargetRangeData_t, VL53LX_Version_t,
 };
 use ::num_enum::{IntoPrimitive, TryFromPrimitive};
+use serde::{Serialize, Deserialize};
 use ::static_assertions::{assert_eq_align, assert_eq_size};
 use heapless::Vec;
 
@@ -68,7 +69,7 @@ fn vl53lxerror_ok_is_0i8() {
     assert_eq!(Ok(()) as Result<(), Vl53lxError>, unsafe { transmute(0i8) });
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MultiRangingData {
     pub stream_count: u8,
     pub xtalk_changed: bool,
@@ -90,7 +91,7 @@ impl From<VL53LX_MultiRangingData_t> for MultiRangingData {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RangeData {
     pub range_min_mm: i16,
     pub range_mm: i16,
@@ -116,7 +117,7 @@ impl From<VL53LX_TargetRangeData_t> for RangeData {
     }
 }
 
-#[derive(Debug, TryFromPrimitive)]
+#[derive(Debug, TryFromPrimitive, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum RangeStatus {
     RangeValid = 0,
