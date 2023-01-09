@@ -13,6 +13,7 @@ static_assertions = "1.1"
 num_enum = { version = "0.5", default-features = false }
 serde = { version = "1.0.145", features = ["serde_derive"] }
 heapless = { version = "0.7.16", features = ["serde"] }
+measurements = { version = "0.11.0", features = ["serde"] }
 
 [features]
 std = []

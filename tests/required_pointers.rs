@@ -1,5 +1,7 @@
 mod simulator;
 
+use std::time::Duration;
+
 use crate::simulator::setup_sensor;
 use ::vl53l3cx_driver::DistanceMode;
 
@@ -15,9 +17,9 @@ test_single!(set_distance_mode(DistanceMode::Short));
 
 test_single!(get_distance_mode());
 
-test_single!(set_measurement_timing_budget_ms(100));
+test_single!(set_measurement_timing_budget(Duration::from_millis(100)));
 
-test_single!(get_measurement_timing_budget_ms());
+test_single!(get_measurement_timing_budget());
 
 test_single!(i2c, start_measurement());
 
