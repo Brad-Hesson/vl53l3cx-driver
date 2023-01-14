@@ -8,7 +8,7 @@ mod types;
 mod wrapper;
 
 use crate::maybe_box::MaybeBox;
-pub use crate::types::{DistanceMode, Error, MultiRangingData, TargetRangeData, RangeStatus};
+pub use crate::types::{DistanceMode, Error, MultiRangingData, RangeStatus, TargetRangeData, Roi};
 use crate::{bindings::*, wrapper::vl53lx_platform_user_data::VL53LX_Dev_t};
 use ::core::{fmt::Debug, marker::PhantomData, ptr};
 use ::embedded_hal::{
@@ -56,8 +56,8 @@ where
     /// Enable the sensor.
     pub fn enable(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), Error> {
         self.xshut_pin
-        .set_high()
-        .expect("setting pin state is infallible");
+            .set_high()
+            .expect("setting pin state is infallible");
         self.with_i2c_and_delay(i2c, delay, |pdev| {
             result(unsafe { VL53LX_WaitDeviceBooted(pdev) })?;
             result(unsafe { VL53LX_DataInit(pdev) })
@@ -74,14 +74,14 @@ where
         self.xshut_pin
     }
 
-    /// Reads the Product Revision for a for given device. 
+    /// Reads the Product Revision for a for given device.
     pub fn get_product_revision(&mut self) -> Result<(u8, u8), Error> {
         let mut major = 0u8;
         let mut minor = 0u8;
         result(unsafe { VL53LX_GetProductRevision(self.dev_t.as_mut(), &mut major, &mut minor) })?;
         Ok((major, minor))
     }
-    /// Reads the Device information for given Device. 
+    /// Reads the Device information for given Device.
     pub fn get_device_info(&mut self) -> Result<VL53LX_DeviceInfo_t, Error> {
         let mut dev_info = VL53LX_DeviceInfo_t::default();
         result(unsafe { VL53LX_GetDeviceInfo(self.dev_t.as_mut(), &mut dev_info) })?;
@@ -103,7 +103,7 @@ where
         self.dev_t.i2c_address = address;
         Ok(())
     }
-    /// Set the distance mode to be used for the next ranging. The modes Short, Medium and Long are used to optimize the ranging accuracy in a specific range of distance. The user select one of these modes to select the distance range. 
+    /// Set the distance mode to be used for the next ranging. The modes Short, Medium and Long are used to optimize the ranging accuracy in a specific range of distance. The user select one of these modes to select the distance range.
     pub fn set_distance_mode(&mut self, mode: DistanceMode) -> Result<(), Error> {
         result(unsafe { VL53LX_SetDistanceMode(self.dev_t.as_mut(), mode.into()) })
     }
@@ -130,7 +130,7 @@ where
         })?;
         Ok(Duration::from_micros(micros as u64))
     }
-    /// Start device measurement. Started measurement will depend on distance parameter set through VL53LX_SetDistanceMode() 
+    /// Start device measurement. Started measurement will depend on distance parameter set through VL53LX_SetDistanceMode()
     pub fn start_measurement(&mut self, i2c: &mut I2C) -> Result<(), Error> {
         self.with_i2c(i2c, |pdev| result(unsafe { VL53LX_StartMeasurement(pdev) }))
     }
@@ -175,6 +175,15 @@ where
         let mut data = VL53LX_AdditionalData_t::default();
         result(unsafe { VL53LX_GetAdditionalData(self.dev_t.as_mut(), &mut data) })?;
         Ok(data)
+    }
+    pub fn set_roi(&mut self, roi: Roi) -> Result<(), Error> {
+        result(unsafe { VL53LX_SetUserROI(self.dev_t.as_mut(), &mut roi.into()) })?;
+        Ok(())
+    }
+    pub fn get_roi(&mut self) -> Result<Roi, Error> {
+        let mut roi = VL53LX_UserRoi_t::default();
+        result(unsafe { VL53LX_GetUserROI(self.dev_t.as_mut(), &mut roi) })?;
+        Ok(roi.into())
     }
     #[inline]
     fn with_i2c<F, T>(&mut self, i2c: &mut I2C, f: F) -> Result<T, Error>
