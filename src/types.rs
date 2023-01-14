@@ -252,6 +252,20 @@ pub struct Roi {
     pub bottom_right_x: u8,
     pub bottom_right_y: u8,
 }
+impl Roi {
+    pub fn centered(size: u8) -> Self {
+        assert_eq!(size % 2, 0, "Size must be even");
+        let half = size / 2;
+        let low = 8 - half;
+        let high = 7 + half;
+        Self {
+            top_left_x: low,
+            top_left_y: high,
+            bottom_right_x: high,
+            bottom_right_y: low,
+        }
+    }
+}
 impl From<Roi> for VL53LX_UserRoi_t {
     fn from(value: Roi) -> Self {
         Self {
