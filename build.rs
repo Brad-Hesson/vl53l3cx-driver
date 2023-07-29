@@ -4,6 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::vec;
 
+use bindgen::callbacks::DeriveInfo;
+
 fn main() {
     let file = Path::new("src/core/src/vl53lx_api.c");
     let search_paths = vec![
@@ -79,9 +81,9 @@ fn get_riscv_target_fixed() -> Option<String> {
 #[derive(Debug)]
 struct AddDerives;
 impl bindgen::callbacks::ParseCallbacks for AddDerives {
-    fn add_derives(&self, name: &str) -> Vec<String> {
+    fn add_derives(&self, derive_info: &DeriveInfo) -> Vec<String> {
         let mut derives = vec![];
-        match name {
+        match derive_info.name {
             "wide_void_ptr" => {}
             "VL53LX_spad_rate_data_t" => {}
             "VL53LX_LLDriverData_t" => {}
@@ -90,7 +92,7 @@ impl bindgen::callbacks::ParseCallbacks for AddDerives {
             "localeinfo_struct" => {}
             _ => derives.push("Default"),
         };
-        match name {
+        match derive_info.name {
             "VL53LX_MultiRangingData_t" => {
                 derives.extend(["serde::Serialize", "serde::Deserialize"])
             }
