@@ -45,11 +45,6 @@ test_single!(i2c, get_multiranging_data());
 
 test_single!(get_additional_data());
 
-test_single!(set_roi(Roi {
-    top_left_x: 0,
-    top_left_y: 15,
-    bottom_right_x: 15,
-    bottom_right_y: 0
-}));
+test_single!(set_roi(Roi::new(0, 3, 3, 0).unwrap()));
 
 test_single!(get_roi());

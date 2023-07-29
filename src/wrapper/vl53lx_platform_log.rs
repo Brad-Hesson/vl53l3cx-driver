@@ -1,4 +1,5 @@
 use core::{ffi::VaListImpl, fmt::Write, ops::Deref, ptr};
+use core::ffi::CStr;
 use rtt_target::rprint;
 
 const DEBUG: bool = false;
@@ -41,6 +42,9 @@ pub static _trace_level: u32 = 0x00000008;
 
 #[no_mangle]
 pub unsafe extern "C" fn sprintf(dst_p: *mut u8, src_p: *mut u8, mut args: ...) -> u32 {
+    let src = CStr::from_ptr(src_p as _);
+    println!("sprintf {:?}", src);
+    return 0;
     let mut dst = CharPtr::from(dst_p);
     write_cstr_formatted(&mut dst, &mut src_p.into(), &mut args);
     write!(dst, "\0").unwrap();

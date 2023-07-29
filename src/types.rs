@@ -1,3 +1,5 @@
+use core::fmt::Display;
+
 use crate::bindings::{
     VL53LX_DeviceInfo_t, VL53LX_MultiRangingData_t, VL53LX_TargetRangeData_t, VL53LX_UserRoi_t,
     VL53LX_Version_t,
@@ -113,7 +115,7 @@ fn vl53lxerror_ok_is_0i8() {
 }
 
 /// Structure for storing the set of range results.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MultiRangingData {
     /// 8-bit Stream Count.
     pub stream_count: u8,
@@ -140,7 +142,7 @@ impl From<VL53LX_MultiRangingData_t> for MultiRangingData {
 }
 
 /// One Range measurement data for each target.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct TargetRangeData {
     /// Tells what is the minimum detection distance of the object in current setup and environment conditions (Filled when applicable)
     pub range_min: Length,
@@ -175,7 +177,7 @@ impl From<VL53LX_TargetRangeData_t> for TargetRangeData {
 }
 
 /// The Range Status is the quality of the latest ranging.
-#[derive(Debug, TryFromPrimitive, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, TryFromPrimitive, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum RangeStatus {
     /// The Range is valid.
@@ -245,7 +247,7 @@ impl From<VL53LX_Version_t> for Version {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Roi {
     pub top_left_x: u8,
     pub top_left_y: u8,
@@ -253,17 +255,37 @@ pub struct Roi {
     pub bottom_right_y: u8,
 }
 impl Roi {
-    pub fn centered(size: u8) -> Self {
-        assert_eq!(size % 2, 0, "Size must be even");
+    pub fn new(tl_x: u8, tl_y: u8, br_x: u8, br_y: u8) -> Result<Self, RoiError> {
+        if [tl_x, tl_y, br_x, br_y].iter().any(|c| *c > 15) {
+            return Err(RoiError::CoordsOutOfBounds);
+        }
+        if tl_y < br_y || br_x < tl_x {
+            return Err(RoiError::WrongCoordOrder);
+        }
+        if tl_y - br_y < 3 || br_x - tl_x < 3 {
+            return Err(RoiError::RoiTooSmall);
+        }
+        Ok(Self {
+            top_left_x: tl_x,
+            top_left_y: tl_y,
+            bottom_right_x: br_x,
+            bottom_right_y: br_y,
+        })
+    }
+    pub fn centered(size: u8) -> Result<Self, RoiError> {
+        if size % 2 != 0 {
+            return Err(RoiError::SizeNotEven);
+        }
         let half = size / 2;
         let low = 8 - half;
         let high = 7 + half;
-        Self {
-            top_left_x: low,
-            top_left_y: high,
-            bottom_right_x: high,
-            bottom_right_y: low,
-        }
+        Self::new(low, high, high, low)
+    }
+    pub fn get_size(&self) -> (u8, u8) {
+        (
+            self.bottom_right_x - self.top_left_x + 1,
+            self.top_left_y - self.bottom_right_y + 1,
+        )
     }
 }
 impl From<Roi> for VL53LX_UserRoi_t {
@@ -285,4 +307,31 @@ impl From<VL53LX_UserRoi_t> for Roi {
             bottom_right_y: value.BotRightY,
         }
     }
+}
+impl Display for Roi {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for y in 0..=15 {
+            for x in 0..=15 {
+                if x >= self.top_left_x
+                    && x <= self.bottom_right_x
+                    && y >= self.bottom_right_y
+                    && y <= self.top_left_y
+                {
+                    f.write_str("# ")?;
+                } else {
+                    f.write_str(". ")?;
+                }
+            }
+            f.write_str("\n")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum RoiError {
+    CoordsOutOfBounds,
+    RoiTooSmall,
+    WrongCoordOrder,
+    SizeNotEven,
 }
