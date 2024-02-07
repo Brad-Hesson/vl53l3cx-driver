@@ -39,6 +39,9 @@
 
 int sprintf(char* fmt, const char* str, ...);
 
+void* memcpy(void* dest, const void* src, size_t n);
+void* memset(void* dest, int t, size_t n);
+
 /**
  * @file   VL53LX_platform.h
  *

@@ -39,14 +39,14 @@ pub unsafe extern "C" fn VL53LX_trace_print_module_function(
 #[no_mangle]
 pub static _trace_level: u32 = 0x00000008;
 
-#[no_mangle]
-pub unsafe extern "C" fn sprintf(dst_p: *mut u8, src_p: *mut u8, mut args: ...) -> u32 {
-    return 0;
-    let mut dst = CharPtr::from(dst_p);
-    write_cstr_formatted(&mut dst, &mut src_p.into(), &mut args);
-    write!(dst, "\0").unwrap();
-    0
-}
+// #[no_mangle]
+// pub unsafe extern "C" fn sprintf(dst_p: *mut u8, src_p: *mut u8, mut args: ...) -> u32 {
+//     return 0;
+//     let mut dst = CharPtr::from(dst_p);
+//     write_cstr_formatted(&mut dst, &mut src_p.into(), &mut args);
+//     write!(dst, "\0").unwrap();
+//     0
+// }
 
 struct CharPtr(*mut u8);
 impl From<*mut u8> for CharPtr {

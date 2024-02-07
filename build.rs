@@ -37,6 +37,7 @@ fn compile_c_code(file: &Path, search_paths: &Vec<&Path>) {
     build.flag_if_supported("-Wno-missing-declarations");
     build.flag("-Wno-implicit-function-declaration");
     build.flag("-Wno-#pragma-messages");
+    build.flag("-O3");
     if let Some(target) = get_riscv_target_fixed() {
         build.target(target.as_str());
         build.flag_if_supported("-Wno-builtin-declaration-mismatch");

@@ -1,11 +1,17 @@
 #![allow(improper_ctypes_definitions)]
-use crate::{VL53LX_Dev_t, Error};
+use crate::{Error, VL53LX_Dev_t};
 use ::core::slice;
 use rtt_target::{rprint, rprintln};
 
 const DEBUG: bool = false;
 
 // TODO: write safety documentation
+
+// void *memcpy(void *dest, const void *src, size_t n)
+// #[no_mangle]
+// pub extern "C" fn memcpy(dest: *mut cty::c_void, src: *const cty::c_void, n: usize) -> *mut cty::c_void {
+//     todo!()
+// }
 
 #[no_mangle]
 pub extern "C" fn VL53LX_WriteMulti(
